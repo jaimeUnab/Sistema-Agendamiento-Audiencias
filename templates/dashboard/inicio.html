@@ -1,0 +1,96 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior) -->
+
+{% block title %}
+Inicio
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+Inicio
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <!-- Tarjeta: Audiencias del día -->
+    <div class="col-md-6 mb-4">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>Audiencias del día</h4>
+
+                <hr>
+
+                <p>No existen audiencias programadas.</p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Tarjeta: Audiencias de la semana -->
+    <div class="col-md-6 mb-4">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>Audiencias de la semana</h4>
+
+                <hr>
+
+                <p>No existen audiencias programadas.</p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>Accesos rápidos</h4>
+
+                <hr>
+
+                <div class="d-flex gap-3 flex-wrap">
+
+                    <button class="btn btn-primary">
+                        Nueva Audiencia
+                    </button>
+
+                    <button class="btn btn-success">
+                        Agenda
+                    </button>
+
+                    <button class="btn btn-secondary">
+                        Usuarios
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

@@ -1,0 +1,1010 @@
+/* =====================================================
+   ESTILOS GENERALES
+===================================================== */
+
+/*
+    Configuración general del sitio.
+
+    Se elimina el margen predeterminado del navegador y se
+    establece la fuente principal utilizada en todo el sistema.
+*/
+body{
+
+    margin:0;
+
+    padding:0;
+
+    background:#f5f7fb;
+
+    font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+
+    color:#1f2937;
+
+}
+
+
+/*
+    Evita que el contenido genere barras de desplazamiento
+    horizontales cuando existan elementos anchos.
+*/
+html,
+body{
+
+    overflow-x:hidden;
+
+}
+
+
+/*
+    Todos los enlaces del sistema utilizarán una transición
+    suave al cambiar de color.
+*/
+a{
+
+    text-decoration:none;
+
+    transition:.25s ease;
+
+}
+
+
+/*
+    Configuración base para las tarjetas.
+
+    Todas las tarjetas del sistema compartirán el mismo
+    diseño para mantener una apariencia uniforme.
+*/
+.card{
+
+    border:none;
+
+    border-radius:18px;
+
+    background:#ffffff;
+
+    box-shadow:0 8px 24px rgba(15,55,107,.08);
+
+    transition:.25s ease;
+
+}
+
+
+/*
+    Al pasar el mouse sobre una tarjeta,
+    esta se eleva ligeramente.
+*/
+.card:hover{
+
+    transform:translateY(-3px);
+
+    box-shadow:0 14px 30px rgba(15,55,107,.12);
+
+}
+
+
+/*
+    Botones generales del sistema.
+
+    Se redondean los bordes para mantener una
+    apariencia moderna.
+*/
+.btn{
+
+    border-radius:12px;
+
+    padding:10px 20px;
+
+    font-weight:600;
+
+    transition:.25s ease;
+
+}
+
+
+/*
+    Animación utilizada por los botones.
+*/
+.btn:hover{
+
+    transform:translateY(-2px);
+
+}
+
+
+/*
+    Títulos principales de cada pantalla.
+
+    Se utilizan en el encabezado del contenido.
+*/
+.page-title{
+
+    font-size:48px;
+
+    font-weight:700;
+
+    color:#14213d;
+
+    margin-bottom:6px;
+
+}
+
+
+/*
+    Subtítulo ubicado bajo el título principal.
+*/
+.page-subtitle{
+
+    color:#6b7280;
+
+    font-size:20px;
+
+}
+
+
+/*
+    Línea divisoria reutilizable.
+
+    Será utilizada entre secciones de tarjetas
+    o formularios.
+*/
+.section-divider{
+
+    border-top:1px solid #e5e7eb;
+
+    margin:20px 0;
+
+}
+
+
+/*
+    Clase reutilizable para aplicar una sombra
+    suave a cualquier componente.
+*/
+.shadow-soft{
+
+    box-shadow:0 8px 20px rgba(0,0,0,.06);
+
+}
+
+
+/*
+    Clase reutilizable para aplicar esquinas
+    redondeadas.
+*/
+.rounded-xl{
+
+    border-radius:18px;
+
+}
+
+/* =====================================================
+   SIDEBAR
+===================================================== */
+
+/* Contenedor principal del menú lateral */
+.sidebar{
+
+    width:280px;
+    min-height:100vh;
+
+    background:#0f376b;
+
+    color:white;
+
+    padding:30px;
+
+}
+
+/* Centra el título del sistema en el menú */
+.sidebar-header{
+
+    text-align:center;
+
+    margin-bottom:40px;
+
+}
+
+/* Estilo del título del sistema */
+.sidebar-header h3{
+
+    font-weight:700;
+
+    line-height:1.4;
+
+    font-size:24px;
+
+}/* =====================================================
+   SIDEBAR
+===================================================== */
+
+/*
+    Contenedor principal del menú lateral.
+
+    Se utiliza un degradado para entregar una apariencia
+    moderna y similar al diseño del sistema.
+*/
+.sidebar{
+
+    width:290px;
+
+    min-height:100vh;
+
+    background:linear-gradient(180deg,#0b2f59 0%,#144b91 100%);
+
+    color:white;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:space-between;
+
+    padding:35px 22px;
+
+}
+
+
+/*
+    Encabezado del menú.
+
+    Contiene el logo y el nombre del sistema.
+*/
+.sidebar-header{
+
+    text-align:center;
+
+}
+
+
+/*
+    Logo del sistema.
+
+    Se representa mediante un icono de Bootstrap.
+*/
+.logo{
+
+    width:90px;
+
+    height:90px;
+
+    margin:auto;
+
+    margin-bottom:20px;
+
+    border-radius:50%;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:rgba(255,255,255,.12);
+
+    border:2px solid rgba(255,255,255,.20);
+
+}
+
+
+/*
+    Icono del logo.
+*/
+.logo i{
+
+    font-size:48px;
+
+    color:white;
+
+}
+
+
+/*
+    Nombre del sistema.
+*/
+.sidebar-header h3{
+
+    font-size:18px;
+
+    font-weight:700;
+
+    line-height:1.6;
+
+    letter-spacing:.8px;
+
+    text-transform:uppercase;
+
+    margin-bottom:40px;
+
+}
+
+
+
+/* =====================================================
+   MENÚ LATERAL
+===================================================== */
+
+/*
+    Contenedor del menú.
+*/
+.menu{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+}
+
+
+/*
+    Cada opción del menú.
+
+    Se utiliza Flexbox para alinear correctamente
+    el icono y el texto.
+*/
+.menu-item{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+    color:white;
+
+    padding:15px 18px;
+
+    border-radius:14px;
+
+    transition:.30s;
+
+    font-weight:500;
+
+}
+
+
+/*
+    Iconos del menú.
+*/
+.menu-item i{
+
+    font-size:22px;
+
+    width:28px;
+
+    text-align:center;
+
+}
+
+
+/*
+    Texto del menú.
+*/
+.menu-item span{
+
+    font-size:16px;
+
+}
+
+
+/*
+    Animación al pasar el mouse.
+*/
+.menu-item:hover{
+
+    background:rgba(255,255,255,.12);
+
+    color:white;
+
+    transform:translateX(5px);
+
+}
+
+
+/*
+    Opción actualmente seleccionada.
+
+    Utiliza un degradado diferente para destacar.
+*/
+.menu-item.active{
+
+    background:linear-gradient(90deg,#2563eb,#3b82f6);
+
+    box-shadow:0 8px 18px rgba(37,99,235,.35);
+
+}
+
+
+/*
+    Usuario ubicado al final del menú.
+*/
+.sidebar-user{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+    margin-top:40px;
+
+    padding-top:22px;
+
+    border-top:1px solid rgba(255,255,255,.15);
+
+}
+
+
+/*
+    Avatar del usuario.
+*/
+.user-avatar{
+
+    font-size:48px;
+
+    color:white;
+
+}
+
+
+/*
+    Información del usuario.
+*/
+.user-info{
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+
+/*
+    Nombre del usuario.
+*/
+.user-info strong{
+
+    font-size:16px;
+
+    font-weight:600;
+
+}
+
+
+/*
+    Cargo del usuario.
+*/
+.user-info small{
+
+    color:#d6d6d6;
+
+    font-size:13px;
+
+}
+
+
+/* =====================================================
+   MENÚ LATERAL
+===================================================== */
+
+/* Estilo base de cada opción del menú */
+.menu-item{
+
+    display:block;
+
+    color:white;
+
+    text-decoration:none;
+
+    padding:15px 20px;
+
+    margin-bottom:10px;
+
+    border-radius:12px;
+
+    transition:.2s;
+
+}
+
+/* Cambia el color al pasar el mouse */
+.menu-item:hover{
+
+    background:#1d5fe3;
+
+    color:white;
+
+}
+
+/* Resalta la opción del menú seleccionada */
+.menu-item.active{
+
+    background:#2d6df6;
+
+}
+
+/* =====================================================
+   CONTENIDO PRINCIPAL
+===================================================== */
+
+/*
+    Área principal donde se muestran todas las pantallas
+    del sistema.
+
+    Se aplica un color muy claro para generar contraste
+    con el menú lateral.
+*/
+.content{
+
+    background:#f4f7fc;
+
+    min-height:100vh;
+
+}
+
+
+/*
+    Barra superior del sistema.
+
+    Contiene el título de la página y la información
+    del usuario autenticado.
+*/
+.topbar{
+
+    background:white;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:28px 40px;
+
+    border-bottom:1px solid #edf1f7;
+
+    box-shadow:0 4px 18px rgba(15,55,107,.05);
+
+}
+
+
+/*
+    Título principal.
+*/
+.page-title{
+
+    margin:0;
+
+    font-size:34px;
+
+    font-weight:700;
+
+    color:#16345f;
+
+}
+
+
+/*
+    Subtítulo.
+*/
+.page-subtitle{
+
+    margin-top:5px;
+
+    margin-bottom:0;
+
+    color:#7a8798;
+
+    font-size:15px;
+
+}
+
+
+/*
+    Contenedor del usuario ubicado
+    en la parte superior derecha.
+*/
+.top-user{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+    background:white;
+
+    padding:10px 18px;
+
+    border-radius:14px;
+
+    border:1px solid #e8edf5;
+
+    transition:.30s;
+
+}
+
+
+/*
+    Animación al pasar el mouse.
+*/
+.top-user:hover{
+
+    box-shadow:0 8px 18px rgba(0,0,0,.08);
+
+}
+
+
+/*
+    Avatar superior.
+*/
+.top-user i{
+
+    font-size:34px;
+
+    color:#2563eb;
+
+}
+
+
+/*
+    Nombre del usuario.
+*/
+.top-user strong{
+
+    display:block;
+
+    color:#1f2937;
+
+    font-size:15px;
+
+}
+
+
+/*
+    Cargo del usuario.
+*/
+.top-user small{
+
+    color:#6b7280;
+
+    font-size:12px;
+
+}
+
+
+/*
+    Contenedor general del contenido.
+
+    Se agrega espacio alrededor de todas las páginas
+    del sistema.
+*/
+.container-fluid{
+
+    padding:35px;
+
+}
+/* =====================================================
+   DASHBOARD
+===================================================== */
+
+/*
+    Contenedor de las tarjetas principales.
+
+    Bootstrap ya utiliza Flexbox mediante "row",
+    por lo que aquí solamente agregamos separación
+    entre las tarjetas.
+*/
+.dashboard-cards{
+
+    margin-top:30px;
+
+}
+
+
+/*
+    Tarjetas de indicadores.
+
+    Estas tarjetas muestran información importante
+    como audiencias del día o audiencias semanales.
+*/
+.dashboard-card{
+
+    background:#ffffff;
+
+    border:none;
+
+    border-radius:22px;
+
+    padding:28px;
+
+    box-shadow:0 12px 28px rgba(15,55,107,.08);
+
+    transition:all .30s ease;
+
+    height:100%;
+
+}
+
+
+/*
+    Animación al pasar el mouse.
+*/
+.dashboard-card:hover{
+
+    transform:translateY(-6px);
+
+    box-shadow:0 18px 35px rgba(15,55,107,.15);
+
+}
+
+
+/*
+    Parte superior de la tarjeta.
+
+    Contiene el icono y el título.
+*/
+.card-header-custom{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:18px;
+
+    margin-bottom:20px;
+
+}
+
+
+/*
+    Círculo donde se muestra el icono.
+*/
+.card-icon{
+
+    width:65px;
+
+    height:65px;
+
+    border-radius:18px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:linear-gradient(135deg,#2563eb,#4f8cff);
+
+    color:white;
+
+    font-size:30px;
+
+}
+
+
+/*
+    Título de la tarjeta.
+*/
+.card-title-custom{
+
+    margin:0;
+
+    font-size:18px;
+
+    font-weight:600;
+
+    color:#16345f;
+
+}
+
+
+/*
+    Número principal.
+
+    Ejemplo:
+
+    12
+    58
+    0
+*/
+.card-number{
+
+    font-size:42px;
+
+    font-weight:700;
+
+    color:#16345f;
+
+    margin-bottom:8px;
+
+}
+
+
+/*
+    Texto descriptivo.
+*/
+.card-text-custom{
+
+    color:#7b8794;
+
+    font-size:15px;
+
+}
+
+
+/* =====================================================
+   ACCESOS RÁPIDOS
+===================================================== */
+
+/*
+    Contenedor de los accesos rápidos.
+*/
+.quick-access{
+
+    margin-top:35px;
+
+}
+
+
+/*
+    Tarjeta utilizada como botón.
+
+    Sustituye al botón tradicional para entregar
+    una apariencia más moderna.
+*/
+.quick-card{
+
+    background:white;
+
+    border-radius:18px;
+
+    padding:22px;
+
+    border:1px solid #edf1f7;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    cursor:pointer;
+
+    transition:all .30s ease;
+
+    box-shadow:0 6px 16px rgba(0,0,0,.04);
+
+}
+
+
+/*
+    Efecto al pasar el mouse.
+*/
+.quick-card:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:0 16px 30px rgba(37,99,235,.15);
+
+    border-color:#2563eb;
+
+}
+
+
+/*
+    Contenedor izquierdo.
+*/
+.quick-left{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:18px;
+
+}
+
+
+/*
+    Icono del acceso rápido.
+*/
+.quick-icon{
+
+    width:55px;
+
+    height:55px;
+
+    border-radius:15px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:#eef4ff;
+
+    color:#2563eb;
+
+    font-size:24px;
+
+}
+
+
+/*
+    Título del acceso rápido.
+*/
+.quick-title{
+
+    margin:0;
+
+    font-size:17px;
+
+    font-weight:600;
+
+    color:#16345f;
+
+}
+
+
+/*
+    Descripción pequeña.
+*/
+.quick-subtitle{
+
+    margin-top:3px;
+
+    color:#7b8794;
+
+    font-size:14px;
+
+}
+
+
+/*
+    Flecha ubicada al lado derecho.
+*/
+.quick-arrow{
+
+    font-size:24px;
+
+    color:#2563eb;
+
+    transition:.25s;
+
+}
+
+
+/*
+    La flecha se desplaza al pasar el mouse.
+*/
+.quick-card:hover .quick-arrow{
+
+    transform:translateX(6px);
+
+}
+
+
+/* =====================================================
+   TÍTULOS DE SECCIÓN
+===================================================== */
+
+/*
+    Encabezados utilizados antes de una sección
+    del Dashboard.
+*/
+.section-title{
+
+    font-size:22px;
+
+    font-weight:700;
+
+    color:#16345f;
+
+    margin-top:40px;
+
+    margin-bottom:20px;
+
+}
+

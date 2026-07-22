@@ -1,0 +1,245 @@
+{% load static %}
+<!--
+    Carga la etiqueta "static" de Django.
+    Permite acceder a archivos estáticos como CSS, JavaScript e imágenes.
+-->
+
+<!DOCTYPE html>
+<!-- Indica que el documento utiliza HTML5. -->
+
+<html lang="es">
+
+<head>
+
+    <!-- ========================================================= -->
+    <!--                 CONFIGURACIÓN GENERAL                      -->
+    <!-- ========================================================= -->
+
+    <!-- Codificación de caracteres -->
+    <meta charset="UTF-8">
+
+    <!-- Diseño adaptable a cualquier dispositivo -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!--
+        Título de la página.
+        Cada plantilla hija puede modificar este bloque.
+    -->
+    <title>
+        {% block title %}
+            Sistema de Agendamiento de Audiencias
+        {% endblock %}
+    </title>
+
+    <!-- ========================================================= -->
+    <!--                     HOJAS DE ESTILO                        -->
+    <!-- ========================================================= -->
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Estilos personalizados -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+</head>
+
+<body>
+
+<!-- ========================================================= -->
+<!--            CONTENEDOR PRINCIPAL DEL SISTEMA               -->
+<!-- ========================================================= -->
+
+<div class="d-flex">
+
+    <!-- ===================================================== -->
+    <!--                  MENÚ LATERAL                         -->
+    <!-- ===================================================== -->
+
+    <aside class="sidebar">
+
+        <!-- Logo del sistema -->
+
+        <div class="sidebar-header">
+
+            <div class="logo">
+
+                <i class="bi bi-bank2"></i>
+
+            </div>
+
+            <h3>
+
+                SISTEMA DE<br>
+                AGENDAMIENTO<br>
+                DE AUDIENCIAS
+
+            </h3>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!--                 MENÚ PRINCIPAL                    -->
+        <!-- ================================================= -->
+
+        <nav class="menu">
+
+            <!-- Inicio -->
+
+            <a href="#" class="menu-item active">
+
+                <i class="bi bi-house-door-fill"></i>
+
+                <span>Inicio</span>
+
+            </a>
+
+
+            <!-- Agenda -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-calendar3"></i>
+
+                <span>Agenda</span>
+
+            </a>
+
+
+            <!-- Nueva audiencia -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-plus-circle"></i>
+
+                <span>Nueva Audiencia</span>
+
+            </a>
+
+
+            <!-- Usuarios -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-people"></i>
+
+                <span>Usuarios</span>
+
+            </a>
+
+
+            <!-- Reglas -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-clipboard-check"></i>
+
+                <span>Reglas de Agendamiento</span>
+
+            </a>
+
+        </nav>
+
+
+        <!-- ================================================= -->
+        <!--             USUARIO DEL SISTEMA                   -->
+        <!-- ================================================= -->
+
+        <div class="sidebar-user">
+
+            <div class="user-avatar">
+
+                <i class="bi bi-person-circle"></i>
+
+            </div>
+
+            <div class="user-info">
+
+                <strong>Funcionario</strong>
+
+                <small>Tribunal</small>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <!-- ===================================================== -->
+    <!--                 CONTENIDO PRINCIPAL                   -->
+    <!-- ===================================================== -->
+
+    <main class="content flex-grow-1">
+
+        <!-- Encabezado superior -->
+
+        <header class="topbar">
+
+            <div>
+
+                <h1 class="page-title">
+
+                    {% block page_title %}
+                        Inicio
+                    {% endblock %}
+
+                </h1>
+
+                <p class="page-subtitle">
+
+                    Resumen general del sistema
+
+                </p>
+
+            </div>
+
+
+            <!-- Usuario superior -->
+
+            <div class="top-user">
+
+                <i class="bi bi-person-circle"></i>
+
+                <div>
+
+                    <strong>Funcionario</strong><br>
+
+                    <small>Tribunal</small>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- ================================================= -->
+        <!--           CONTENIDO DE CADA PÁGINA                -->
+        <!-- ================================================= -->
+
+        <div class="container-fluid mt-4">
+
+            {% block content %}
+            {% endblock %}
+
+        </div>
+
+    </main>
+
+</div>
+
+<!-- ========================================================= -->
+<!--                     JAVASCRIPT                            -->
+<!-- ========================================================= -->
+
+<!-- Bootstrap -->
+<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+
+</body>
+
+</html>
