@@ -13,4 +13,7 @@ urlpatterns = [
     # Rutas de la aplicación Usuarios
     path("usuarios/", include("usuarios.urls")),
 
+    # Rutas de la aplicación Bloques
+    path("bloques/", include("bloques.urls")),
+
 ]

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     # Aplicaciones del proyecto
     'dashboard',
     'usuarios',
+    'bloques',
 
 ]
 
