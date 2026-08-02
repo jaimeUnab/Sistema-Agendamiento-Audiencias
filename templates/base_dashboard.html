@@ -90,7 +90,7 @@
 
             <!-- Inicio -->
 
-            <a href="#" class="menu-item active">
+            <a href="{% url 'inicio' %}" class="menu-item active">
 
                 <i class="bi bi-house-door-fill"></i>
 
@@ -123,7 +123,7 @@
 
             <!-- Usuarios -->
 
-            <a href="#" class="menu-item">
+            <a href="{% url 'lista_usuarios' %}" class="menu-item">
 
                 <i class="bi bi-people"></i>
 
@@ -236,6 +236,22 @@
         <!-- ================================================= -->
 
         <div class="container-fluid mt-4">
+
+            <!-- ============================================= -->
+            <!--             MENSAJES DEL SISTEMA               -->
+            <!-- ============================================= -->
+
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+
+                    {{ message }}
+
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+                </div>
+                {% endfor %}
+            {% endif %}
 
             {% block content %}
             {% endblock %}

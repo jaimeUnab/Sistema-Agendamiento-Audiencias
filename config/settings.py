@@ -200,3 +200,17 @@ LOGIN_REDIRECT_URL = "/"
 
 # Página a la que se redirige después de cerrar sesión
 LOGOUT_REDIRECT_URL = "/usuarios/login/"
+
+# =====================================================
+# MENSAJES DEL SISTEMA
+# =====================================================
+
+# Django usa el tag "error" para el nivel ERROR, pero
+# Bootstrap no define la clase "alert-error" (usa
+# "alert-danger"). Se remapea para que las alertas del
+# template siempre coincidan con una clase Bootstrap real.
+from django.contrib.messages import constants as message_constants
+
+MESSAGE_TAGS = {
+    message_constants.ERROR: "danger",
+}
