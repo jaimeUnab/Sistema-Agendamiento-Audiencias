@@ -7,6 +7,7 @@ from .views import (
     UsuarioLoginView,
     UsuarioLogoutView,
     UsuarioCreateView,
+    UsuarioUpdateView,
     lista_usuarios,
 )
 
@@ -25,4 +26,7 @@ urlpatterns = [
 
     # Alta de un nuevo usuario (solo administradores o superusuarios).
     path("nuevo/", UsuarioCreateView.as_view(), name="nuevo_usuario"),
+
+    # Edición de un usuario existente (solo administradores o superusuarios).
+    path("<int:pk>/editar/", UsuarioUpdateView.as_view(), name="editar_usuario"),
 ]

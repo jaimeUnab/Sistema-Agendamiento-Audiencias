@@ -78,6 +78,23 @@ class UsuarioForm(forms.ModelForm):
         "is_active",
     ]
 
+    def __init__(self, *args, **kwargs):
+        """
+        Al editar un usuario existente (self.instance.pk ya
+        asignado), la contraseña pasa a ser opcional: si el
+        administrador deja ambos campos en blanco, la
+        contraseña actual no se modifica. Al crear un usuario
+        nuevo (instance.pk aún None) siguen siendo
+        obligatorios, sin cambios respecto al comportamiento
+        original.
+        """
+
+        super().__init__(*args, **kwargs)
+
+        if self.instance.pk:
+            self.fields["password1"].required = False
+            self.fields["password2"].required = False
+
     # =================================================
     # VALIDACIONES
     # =================================================
@@ -86,11 +103,23 @@ class UsuarioForm(forms.ModelForm):
         """
         Valida que el correo electrónico ingresado
         no esté registrado previamente en el sistema.
+
+        Al editar, se excluye la propia instancia de la
+        búsqueda: de lo contrario, guardar un usuario sin
+        cambiar su correo lo rechazaría por "duplicado"
+        contra sí mismo.
         """
 
         email = self.cleaned_data.get("email")
 
-        if Usuario.objects.filter(email=email).exists():
+        usuarios_con_ese_email = Usuario.objects.filter(email=email)
+
+        if self.instance.pk:
+            usuarios_con_ese_email = usuarios_con_ese_email.exclude(
+                pk=self.instance.pk
+            )
+
+        if usuarios_con_ese_email.exists():
             raise ValidationError(
                 "Ya existe un usuario registrado con este correo electrónico."
             )
@@ -99,14 +128,31 @@ class UsuarioForm(forms.ModelForm):
 
     def clean(self):
         """
-        Valida que las contraseñas ingresadas
-        coincidan entre sí.
+        Valida las contraseñas ingresadas.
+
+        - Si ambas están vacías: válido, no se modifica
+          la contraseña actual (solo relevante al editar).
+        - Si solo una de las dos fue completada: inválido,
+          se exige ingresar y confirmar la nueva contraseña
+          junta, nunca por separado.
+        - Si ambas fueron completadas pero no coinciden:
+          inválido.
         """
 
         cleaned_data = super().clean()
 
         password1 = cleaned_data.get("password1")
         password2 = cleaned_data.get("password2")
+
+        if password1 and not password2:
+            raise ValidationError(
+                "Debes confirmar la nueva contraseña."
+            )
+
+        if password2 and not password1:
+            raise ValidationError(
+                "Debes ingresar la nueva contraseña antes de confirmarla."
+            )
 
         if password1 and password2 and password1 != password2:
             raise ValidationError(
@@ -121,16 +167,22 @@ class UsuarioForm(forms.ModelForm):
 
     def save(self, commit=True):
         """
-        Guarda el usuario cifrando la contraseña
-        mediante set_password(), evitando almacenarla
-        en texto plano.
+        Guarda el usuario cifrando la contraseña mediante
+        set_password(), evitando almacenarla en texto plano.
+
+        Si no se ingresó una contraseña nueva (caso de
+        edición con campos en blanco), la contraseña actual
+        del usuario se mantiene sin cambios.
         """
 
         # Crea la instancia del usuario sin guardarla aún.
         usuario = super().save(commit=False)
 
-        # Cifra y asigna la contraseña ingresada.
-        usuario.set_password(self.cleaned_data["password1"])
+        password1 = self.cleaned_data.get("password1")
+
+        # Solo cifra y asigna la contraseña si se ingresó una nueva.
+        if password1:
+            usuario.set_password(password1)
 
         if commit:
             usuario.save()

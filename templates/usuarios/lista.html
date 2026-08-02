@@ -48,6 +48,7 @@ Usuarios
                             <th>Correo</th>
                             <th>Rol</th>
                             <th>Estado</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
 
@@ -65,11 +66,17 @@ Usuarios
                                     <span class="badge bg-secondary">Inactivo</span>
                                 {% endif %}
                             </td>
+                            <td>
+                                <!-- Botón que dirige a la edición del usuario de esta fila -->
+                                <a href="{% url 'editar_usuario' usuario.pk %}" class="btn btn-sm btn-outline-primary">
+                                    Editar
+                                </a>
+                            </td>
                         </tr>
                         {% empty %}
                         <!-- Mensaje mostrado cuando no existen usuarios registrados -->
                         <tr>
-                            <td colspan="4" class="text-center">
+                            <td colspan="5" class="text-center">
                                 No existen usuarios registrados.
                             </td>
                         </tr>
