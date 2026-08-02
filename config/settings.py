@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'dashboard',
     'usuarios',
     'bloques',
+    'competencias',
 
 ]
 

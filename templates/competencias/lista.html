@@ -1,0 +1,77 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior) -->
+
+{% block title %}
+Competencias
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+Competencias
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>Listado de competencias</h4>
+
+                <hr>
+
+                <!-- Catálogo de solo lectura: únicamente muestra
+                     Nombre, Descripción y Estado, sin botones. -->
+                <table class="table table-hover align-middle">
+
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for competencia in competencias %}
+                        <tr>
+                            <td>{{ competencia.nombre }}</td>
+                            <td>{{ competencia.descripcion }}</td>
+                            <td>
+                                {% if competencia.activa %}
+                                    <span class="badge bg-success">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactiva</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <!-- Mensaje mostrado cuando no existen competencias registradas -->
+                        <tr>
+                            <td colspan="3" class="text-center">
+                                No existen competencias registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

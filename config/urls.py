@@ -16,4 +16,7 @@ urlpatterns = [
     # Rutas de la aplicación Bloques
     path("bloques/", include("bloques.urls")),
 
+    # Rutas de la aplicación Competencias
+    path("competencias/", include("competencias.urls")),
+
 ]
