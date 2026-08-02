@@ -177,3 +177,26 @@ STATICFILES_DIRS = [
 # =============================================================================
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# =====================================================
+# MODELO DE USUARIO PERSONALIZADO
+# =====================================================
+
+# Indica a Django que utilizará el modelo Usuario
+# definido en la aplicación usuarios.
+
+AUTH_USER_MODEL = "usuarios.Usuario"
+
+# =====================================================
+# CONFIGURACIÓN DE AUTENTICACIÓN
+# =====================================================
+
+# Página donde se solicita el inicio de sesión
+LOGIN_URL = "/usuarios/login/"
+
+# Página a la que se redirige después de iniciar sesión
+LOGIN_REDIRECT_URL = "/"
+
+# Página a la que se redirige después de cerrar sesión
+LOGOUT_REDIRECT_URL = "/usuarios/login/"
