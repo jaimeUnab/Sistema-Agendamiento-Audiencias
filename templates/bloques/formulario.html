@@ -1,0 +1,89 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior),
+     la misma que usan el Dashboard y el Listado de Bloques Horarios, para
+     mantener una identidad visual consistente en todo el sistema.
+
+     Esta plantilla se reutiliza tanto para crear como para
+     editar un bloque horario: la vista crear_bloque no envía
+     la clave "bloque" en el contexto (queda indefinida/falsa),
+     mientras que editar_bloque sí la envía con la instancia
+     cargada. Eso es lo único que distingue un modo del otro
+     aquí. -->
+
+{% block title %}
+{% if bloque %}Editar Bloque Horario{% else %}Nuevo Bloque Horario{% endif %}
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+{% if bloque %}Editar Bloque Horario{% else %}Nuevo Bloque Horario{% endif %}
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <div class="col">
+
+        <!-- Misma tarjeta (card shadow-sm) usada en el Listado de Bloques Horarios -->
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>{% if bloque %}Editar Bloque Horario{% else %}Nuevo Bloque Horario{% endif %}</h4>
+
+                <hr>
+
+                <!-- ========================================= -->
+                <!--                FORMULARIO                  -->
+                <!-- ========================================= -->
+                <!-- Se utiliza exclusivamente {{ form }}: BloqueHorarioForm
+                     ya define sus campos (Orden, Hora de inicio, Hora de
+                     término, Permite agendamiento automático) y las
+                     validaciones del modelo, por lo que aquí no se vuelve
+                     a declarar ningún campo manualmente. Al editar, el
+                     propio formulario marca Orden, Hora de inicio y Hora
+                     de término como disabled (solo lectura): la jornada
+                     oficial no se modifica desde la edición, solo si el
+                     bloque puede proponerse automáticamente. El renderizado
+                     por defecto de Django incluye tanto los errores de
+                     cada campo como los errores generales del formulario
+                     (non_field_errors). -->
+
+                <form method="post">
+
+                    {% csrf_token %}
+
+                    {{ form }}
+
+                    <!-- ===================================== -->
+                    <!--                BOTONES                 -->
+                    <!-- ===================================== -->
+
+                    <div class="mt-4">
+
+                        <button type="submit" class="btn btn-primary">
+                            {% if bloque %}Guardar Cambios{% else %}Guardar{% endif %}
+                        </button>
+
+                        <!-- Cancelar regresa al listado sin guardar cambios -->
+                        <a href="{% url 'lista_bloques' %}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

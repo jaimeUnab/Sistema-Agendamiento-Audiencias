@@ -32,7 +32,7 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
         "orden",
         "horaInicio",
         "horaTermino",
-        "activo",
+        "permiteAgendamientoAutomatico",
     )
 
     # Campos por los cuales se podrá buscar.

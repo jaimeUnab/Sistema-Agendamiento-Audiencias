@@ -91,7 +91,7 @@ class Command(BaseCommand):
                     horaInicio=hora_actual.time(),
                     horaTermino=(hora_actual + duracion).time(),
                     orden=orden,
-                    activo=True,
+                    permiteAgendamientoAutomatico=True,
                 )
             )
 

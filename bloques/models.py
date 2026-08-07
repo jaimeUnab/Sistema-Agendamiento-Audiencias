@@ -21,11 +21,15 @@ class BloqueHorario(models.Model):
     Representa un bloque horario del horario oficial
     del tribunal.
 
-    Los bloques únicamente describen el horario oficial;
-    este modelo no contiene ninguna lógica de validación.
-    Más adelante, ValidadorAgendamiento utilizará estos
-    bloques solo para generar advertencias y propuestas de
-    fecha, sin impedir agendar audiencias fuera de él.
+    Los bloques del horario oficial nunca dejan de existir;
+    no tienen un estado de "activo/inactivo". Lo que puede
+    variar es si el algoritmo de agendamiento está habilitado
+    para proponerlos automáticamente (ver
+    permiteAgendamientoAutomatico). Este modelo no contiene
+    ninguna lógica de validación: más adelante,
+    ValidadorAgendamiento utilizará estos bloques solo para
+    generar advertencias y propuestas de fecha, sin impedir
+    agendar audiencias fuera de él.
     """
 
     # Hora de inicio del bloque.
@@ -45,10 +49,14 @@ class BloqueHorario(models.Model):
         verbose_name="Orden"
     )
 
-    # Indica si el bloque está actualmente vigente.
-    activo = models.BooleanField(
+    # Indica si el algoritmo de agendamiento puede proponer
+    # este bloque automáticamente. No representa si el bloque
+    # "existe" o no: el horario oficial siempre conserva
+    # todos sus bloques; esto solo habilita/inhabilita su
+    # propuesta automática.
+    permiteAgendamientoAutomatico = models.BooleanField(
         default=True,
-        verbose_name="Activo"
+        verbose_name="Permite agendamiento automático"
     )
 
     # =================================================

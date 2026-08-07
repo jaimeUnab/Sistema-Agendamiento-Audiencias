@@ -22,7 +22,20 @@ Bloques Horarios
 
             <div class="card-body">
 
-                <h4>Listado de bloques horarios</h4>
+                <!-- ===================================== -->
+                <!--                BOTONES                 -->
+                <!-- ===================================== -->
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <h4>Listado de bloques horarios</h4>
+
+                    <!-- Botón que dirige al alta de un nuevo bloque horario -->
+                    <a href="{% url 'crear_bloque' %}" class="btn btn-primary">
+                        Nuevo Bloque
+                    </a>
+
+                </div>
 
                 <hr>
 
@@ -34,8 +47,7 @@ Bloques Horarios
                             <th>Orden</th>
                             <th>Hora Inicio</th>
                             <th>Hora Término</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
+                            <th>Automático</th>
                         </tr>
                     </thead>
 
@@ -47,24 +59,34 @@ Bloques Horarios
                             <td>{{ bloque.horaInicio|time:"H:i" }}</td>
                             <td>{{ bloque.horaTermino|time:"H:i" }}</td>
                             <td>
-                                {% if bloque.activo %}
-                                    <span class="badge bg-success">Activo</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Inactivo</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <!-- Botón preparado para la futura activación/desactivación.
-                                     Todavía no ejecuta ninguna acción. -->
-                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
-                                    Cambiar Estado
-                                </button>
+                                <!-- El badge ES el control de edición: un formulario POST
+                                     que invoca cambiar_agendamiento_automatico e invierte
+                                     el valor directamente, sin pasar por una pantalla de
+                                     edición aparte. Se usa POST -igual que el cierre de
+                                     sesión y que el cambio de estado de Salas- porque
+                                     modifica datos y no debe poder dispararse con un
+                                     simple enlace GET. -->
+                                <form method="post" action="{% url 'cambiar_agendamiento_automatico' bloque.pk %}" class="d-inline">
+
+                                    {% csrf_token %}
+
+                                    {% if bloque.permiteAgendamientoAutomatico %}
+                                        <button type="submit" class="btn btn-sm badge bg-success border-0">
+                                            Sí
+                                        </button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-sm badge bg-secondary border-0">
+                                            No
+                                        </button>
+                                    {% endif %}
+
+                                </form>
                             </td>
                         </tr>
                         {% empty %}
                         <!-- Mensaje mostrado cuando no existen bloques registrados -->
                         <tr>
-                            <td colspan="5" class="text-center">
+                            <td colspan="4" class="text-center">
                                 No existen bloques horarios registrados.
                             </td>
                         </tr>
