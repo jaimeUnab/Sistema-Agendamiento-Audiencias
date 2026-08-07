@@ -170,20 +170,12 @@
 
 
             <!-- Salas -->
-            <!--
-                Pendiente: la app "salas" todavía no tiene
-                urls.py ni vista de listado (fuera del alcance
-                de esta tarea), por lo que el enlace queda
-                inerte (href="#") y marcado como pendiente,
-                igual que Reglas de Agendamiento y Días No
-                Disponibles.
-            -->
 
-            <a href="#" class="menu-item">
+            <a href="{% url 'lista_salas' %}" class="menu-item">
 
                 <i class="bi bi-door-closed"></i>
 
-                <span>Salas <small class="text-white-50">(pendiente)</small></span>
+                <span>Salas</span>
 
             </a>
 

@@ -1,0 +1,77 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior) -->
+
+{% block title %}
+Reglas de Agendamiento
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+Reglas de Agendamiento
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>Listado de reglas de agendamiento</h4>
+
+                <hr>
+
+                <!-- Catálogo de solo lectura: únicamente muestra
+                     Competencia, Día de la semana y Estado, sin botones. -->
+                <table class="table table-hover align-middle">
+
+                    <thead>
+                        <tr>
+                            <th>Competencia</th>
+                            <th>Día de la semana</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for regla in reglas %}
+                        <tr>
+                            <td>{{ regla.competencia }}</td>
+                            <td>{{ regla.get_diaSemana_display }}</td>
+                            <td>
+                                {% if regla.activa %}
+                                    <span class="badge bg-success">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactiva</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <!-- Mensaje mostrado cuando no existen reglas registradas -->
+                        <tr>
+                            <td colspan="3" class="text-center">
+                                No existen reglas de agendamiento registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

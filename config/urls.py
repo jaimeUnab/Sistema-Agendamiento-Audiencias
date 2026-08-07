@@ -25,4 +25,10 @@ urlpatterns = [
     # Rutas de la aplicación Salas
     path("salas/", include("salas.urls")),
 
+    # Rutas de la aplicación Reglas de Agendamiento
+    path("reglas-agendamiento/", include("reglas_agendamiento.urls")),
+
+    # Rutas de la aplicación Días No Disponibles
+    path("dias-no-disponibles/", include("dias_no_disponibles.urls")),
+
 ]
