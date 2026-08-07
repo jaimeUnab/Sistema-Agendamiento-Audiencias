@@ -121,6 +121,21 @@
             </a>
 
 
+            <!-- ================================================= -->
+            <!--             SECCIÓN: CONFIGURACIÓN                -->
+            <!-- ================================================= -->
+            <!--
+                Agrupa visualmente los mantenedores/catálogos del
+                sistema. Es solo un encabezado de texto (usa clases
+                utilitarias de Bootstrap ya cargado por el proyecto,
+                sin agregar ningún archivo CSS nuevo).
+            -->
+
+            <div class="text-white-50 text-uppercase small fw-semibold px-2 mt-3 mb-1">
+                ⚙️ Configuración
+            </div>
+
+
             <!-- Usuarios -->
 
             <a href="{% url 'lista_usuarios' %}" class="menu-item">
@@ -132,13 +147,78 @@
             </a>
 
 
-            <!-- Reglas -->
+            <!-- Competencias -->
+
+            <a href="{% url 'lista_competencias' %}" class="menu-item">
+
+                <i class="bi bi-diagram-3"></i>
+
+                <span>Competencias</span>
+
+            </a>
+
+
+            <!-- Tipos de Audiencia -->
+
+            <a href="{% url 'lista_tipos_audiencia' %}" class="menu-item">
+
+                <i class="bi bi-list-check"></i>
+
+                <span>Tipos de Audiencia</span>
+
+            </a>
+
+
+            <!-- Salas -->
+            <!--
+                Pendiente: la app "salas" todavía no tiene
+                urls.py ni vista de listado (fuera del alcance
+                de esta tarea), por lo que el enlace queda
+                inerte (href="#") y marcado como pendiente,
+                igual que Reglas de Agendamiento y Días No
+                Disponibles.
+            -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-door-closed"></i>
+
+                <span>Salas <small class="text-white-50">(pendiente)</small></span>
+
+            </a>
+
+
+            <!-- Bloques Horarios -->
+
+            <a href="{% url 'lista_bloques' %}" class="menu-item">
+
+                <i class="bi bi-clock-history"></i>
+
+                <span>Bloques Horarios</span>
+
+            </a>
+
+
+            <!-- Reglas de Agendamiento -->
+            <!-- Pendiente: funcionalidad aún no implementada. -->
 
             <a href="#" class="menu-item">
 
                 <i class="bi bi-clipboard-check"></i>
 
-                <span>Reglas de Agendamiento</span>
+                <span>Reglas de Agendamiento <small class="text-white-50">(pendiente)</small></span>
+
+            </a>
+
+
+            <!-- Días No Disponibles -->
+            <!-- Pendiente: funcionalidad aún no implementada. -->
+
+            <a href="#" class="menu-item">
+
+                <i class="bi bi-calendar-x"></i>
+
+                <span>Días No Disponibles <small class="text-white-50">(pendiente)</small></span>
 
             </a>
 
@@ -172,13 +252,29 @@
         <!--             CERRAR SESIÓN                         -->
         <!-- ================================================= -->
 
-        <a href="{% url 'logout' %}" class="menu-item">
+        <!--
+            LogoutView (Django 5) solo acepta solicitudes POST.
+            Se reemplaza el enlace GET por un formulario POST con
+            csrf_token. El botón conserva la clase "menu-item" para
+            heredar exactamente el mismo estilo del resto del menú;
+            los estilos en línea solo neutralizan la apariencia por
+            defecto del navegador para <button> (fondo, borde,
+            alineación y fuente), sin tocar ningún archivo CSS.
+        -->
+        <form method="post" action="{% url 'logout' %}" style="margin:0;">
 
-            <i class="bi bi-box-arrow-right"></i>
+            {% csrf_token %}
 
-            <span>Cerrar sesión</span>
+            <button type="submit" class="menu-item"
+                    style="width:100%; background:none; border:none; text-align:left; font:inherit; cursor:pointer;">
 
-        </a>
+                <i class="bi bi-box-arrow-right"></i>
+
+                <span>Cerrar sesión</span>
+
+            </button>
+
+        </form>
 
     </aside>
 

@@ -1,0 +1,96 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior) -->
+
+{% block title %}
+Salas
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+Salas
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <!-- ===================================== -->
+                <!--                BOTONES                 -->
+                <!-- ===================================== -->
+
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <h4>Listado de salas</h4>
+
+                    <!-- Botón que dirigirá al alta de una nueva sala.
+                         Todavía no implementado (esta tarea solo cubre el listado). -->
+                    <a href="#" class="btn btn-primary">
+                        Nueva Sala
+                    </a>
+
+                </div>
+
+                <hr>
+
+                <!-- Tabla con las salas registradas en el sistema -->
+                <table class="table table-hover align-middle">
+
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for sala in salas %}
+                        <tr>
+                            <td>{{ sala.nombre }}</td>
+                            <td>
+                                {% if sala.activa %}
+                                    <span class="badge bg-success">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <!-- Botón que dirigirá a la edición de esta sala.
+                                     Todavía no implementado (esta tarea solo cubre el listado). -->
+                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                    Editar
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <!-- Mensaje mostrado cuando no existen salas registradas -->
+                        <tr>
+                            <td colspan="3" class="text-center">
+                                No existen salas registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

@@ -19,4 +19,10 @@ urlpatterns = [
     # Rutas de la aplicación Competencias
     path("competencias/", include("competencias.urls")),
 
+    # Rutas de la aplicación Tipos de Audiencia
+    path("tipos-audiencia/", include("tipos_audiencia.urls")),
+
+    # Rutas de la aplicación Salas
+    path("salas/", include("salas.urls")),
+
 ]

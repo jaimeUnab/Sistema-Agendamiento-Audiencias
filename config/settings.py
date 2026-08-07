@@ -41,6 +41,10 @@ INSTALLED_APPS = [
     'usuarios',
     'bloques',
     'competencias',
+    'tipos_audiencia',
+    'salas',
+    'reglas_agendamiento',
+    'dias_no_disponibles',
 
 ]
 
