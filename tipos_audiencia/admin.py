@@ -29,11 +29,7 @@ class TipoAudienciaAdmin(admin.ModelAdmin):
 
     # Columnas que se mostrarán en la lista.
     list_display = (
-        "competencia",
         "nombre",
-        "plazoMinimoDias",
-        "plazoMaximoDias",
-        "tipoPlazo",
         "activo",
     )
 
@@ -44,6 +40,5 @@ class TipoAudienciaAdmin(admin.ModelAdmin):
 
     # Filtros laterales.
     list_filter = (
-        "competencia",
-        "tipoPlazo",
+        "activo",
     )

@@ -31,4 +31,7 @@ urlpatterns = [
     # Rutas de la aplicación Días No Disponibles
     path("dias-no-disponibles/", include("dias_no_disponibles.urls")),
 
+    # Rutas de la aplicación Audiencias
+    path("audiencias/", include("audiencias.urls")),
+
 ]

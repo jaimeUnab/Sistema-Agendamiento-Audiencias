@@ -1,0 +1,169 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior).
+     Pestaña "General" del módulo "Reglas de Agendamiento": edita la
+     configuración general de agendamiento (ConfiguracionAgendamiento,
+     modelo de la app "bloques") y muestra -de solo lectura- el
+     catálogo de salas, reutilizando el CRUD ya existente de la app
+     "salas" para sus acciones ("+ Agregar sala" y "Editar"). -->
+
+{% block title %}
+Reglas de Agendamiento - General
+{% endblock %}
+
+{% block page_title %}
+Reglas de Agendamiento
+{% endblock %}
+
+{% block content %}
+
+{% include "reglas_agendamiento/_tabs.html" %}
+
+<!-- ========================================= -->
+<!--          JORNADA DE ATENCIÓN               -->
+<!-- ========================================= -->
+
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <h6 class="fw-bold">
+            <i class="bi bi-clock"></i>
+            Jornada de atención
+        </h6>
+        <p class="text-muted small mb-3">
+            Configure el horario general en que el tribunal se encuentra
+            disponible para agendar audiencias.
+        </p>
+
+        <hr>
+
+        <!-- Se utiliza exclusivamente {{ form }}: ConfiguracionAgendamientoForm
+             ya define sus 4 campos (Hora de inicio de la jornada, Hora de
+             término de la jornada, Duración del bloque, Horizonte de
+             búsqueda) y sus validaciones; aquí solo se reorganiza en filas
+             usando el grid de Bootstrap 5, para acercarse a la
+             distribución del mockup, sin declarar ningún campo nuevo. -->
+        <form method="post">
+
+            {% csrf_token %}
+
+            {{ form.non_field_errors }}
+
+            <div class="row g-3">
+
+                <div class="col-md-4">
+                    {{ form.horaInicioJornada.label_tag }}
+                    {{ form.horaInicioJornada }}
+                    {{ form.horaInicioJornada.errors }}
+                </div>
+
+                <div class="col-md-4">
+                    {{ form.horaTerminoJornada.label_tag }}
+                    {{ form.horaTerminoJornada }}
+                    {{ form.horaTerminoJornada.errors }}
+                </div>
+
+                <div class="col-md-4">
+                    {{ form.duracionBloque.label_tag }}
+                    {{ form.duracionBloque }}
+                    {{ form.duracionBloque.errors }}
+                </div>
+
+            </div>
+
+            <div class="row g-3 mt-1">
+
+                <div class="col-md-4">
+                    {{ form.horizonteBusquedaDias.label_tag }}
+                    {{ form.horizonteBusquedaDias }}
+                    {{ form.horizonteBusquedaDias.errors }}
+                </div>
+
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i>
+                    Guardar cambios
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- ========================================= -->
+<!--                   SALAS                    -->
+<!-- ========================================= -->
+<!-- Solo lectura: la alta/edición/activación de salas ya existe,
+     completa y funcional, en la app "salas". Esta sección no la
+     duplica; sus botones llevan directamente a esas vistas. -->
+
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h6 class="fw-bold mb-0">
+                    <i class="bi bi-door-closed"></i>
+                    Salas
+                </h6>
+                <p class="text-muted small mb-0">
+                    Administre las salas disponibles para la realización de audiencias.
+                </p>
+            </div>
+
+            <a href="{% url 'crear_sala' %}" class="btn btn-outline-primary">
+                + Agregar sala
+            </a>
+
+        </div>
+
+        <hr>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Nombre de la sala</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sala in salas %}
+                    <tr>
+                        <td>{{ sala.nombre }}</td>
+                        <td>
+                            {% if sala.activa %}
+                                <span class="badge bg-success">Activa</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactiva</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'editar_sala' sala.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            No existen salas registradas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

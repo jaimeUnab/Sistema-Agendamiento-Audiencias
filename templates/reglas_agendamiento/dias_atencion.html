@@ -1,0 +1,208 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior).
+     Pestaña "Asignación de días por competencia" del módulo "Reglas
+     de Agendamiento": matriz Competencia × Día de la semana. Esta es
+     la ÚNICA interfaz para administrar DiaAtencion: el formulario
+     tradicional / listado de registros que usaba antes esta pantalla
+     (configurar_dia_atencion, editar_dia_atencion,
+     cambiar_estado_dia_atencion) se eliminó por completo al quedar
+     sin uso una vez implementada la matriz.
+
+     Un único <form> cubre TODA la matriz: el funcionario puede tocar
+     varias celdas (cada una es un <button type="button"> que solo
+     cambia su apariencia y un <input type="checkbox"> oculto
+     asociado, vía JavaScript) y recién se guarda todo junto al
+     presionar "Guardar cambios", que hace un POST a
+     guardar_dias_atencion (ver reglas_agendamiento/views.py). No hay
+     ningún <form> por celda. -->
+
+{% block title %}
+Reglas de Agendamiento - Asignación de días
+{% endblock %}
+
+{% block page_title %}
+Reglas de Agendamiento
+{% endblock %}
+
+{% block content %}
+
+{% include "reglas_agendamiento/_tabs.html" %}
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <!-- ===================================== -->
+        <!--   TÍTULO + DESCRIPCIÓN + LEYENDA        -->
+        <!-- ===================================== -->
+
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+
+            <div>
+                <h5 class="mb-1">Asignación de días por competencia</h5>
+                <p class="text-muted mb-0">
+                    Seleccione los días en que cada competencia permite agendar audiencias.
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+
+                <span class="text-success fw-bold">●</span> <span class="text-muted small">Habilitado</span>
+                <span class="text-secondary fw-bold">○</span> <span class="text-muted small">No habilitado</span>
+
+                <!-- type="reset" + form="...": el atributo "form" asocia este
+                     botón al <form> de la matriz aunque esté fuera de él en
+                     el HTML (estándar HTML5). Al presionarlo, el navegador
+                     restablece los checkboxes ocultos a su valor "checked"
+                     original -es decir, al último estado GUARDADO en la
+                     base de datos, que es como se renderizó la página-; el
+                     evento "reset" (ver <script> más abajo) sincroniza la
+                     apariencia visual de cada celda con ese valor
+                     restablecido. No existe un concepto de "configuración
+                     por defecto" distinto del último estado guardado: no
+                     se inventa ninguna regla de negocio nueva aquí. -->
+                <button type="reset" form="form-matriz-dias" class="btn btn-outline-secondary btn-sm">
+                    Restablecer por defecto
+                </button>
+
+            </div>
+
+        </div>
+
+        <hr>
+
+        <form id="form-matriz-dias" method="post" action="{% url 'guardar_dias_atencion' %}">
+
+            {% csrf_token %}
+
+            <!-- ===================================== -->
+            <!--                MATRIZ                  -->
+            <!-- ===================================== -->
+
+            <div class="table-responsive">
+                <table class="table table-bordered text-center align-middle mb-0">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-start">Competencia</th>
+                            {% for valor, etiqueta in dias_semana %}
+                            <th>{{ etiqueta }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for fila in filas %}
+                        <tr>
+                            <td class="text-start fw-semibold">{{ fila.competencia.nombre }}</td>
+
+                            {% for celda in fila.celdas %}
+                            <td>
+                                <!-- Checkbox oculto: es el que realmente viaja en el
+                                     POST (name="dia_<competencia_id>_<diaSemana>",
+                                     presente solo si está marcado). El botón visible
+                                     de al lado nunca envía nada por sí mismo (type=
+                                     "button"); solo alterna este checkbox y su
+                                     propia apariencia (ver alternarCeldaDia). -->
+                                <input type="checkbox"
+                                       class="d-none celda-dia"
+                                       id="chk_{{ fila.competencia.id }}_{{ celda.dia }}"
+                                       name="dia_{{ fila.competencia.id }}_{{ celda.dia }}"
+                                       {% if celda.habilitado %}checked{% endif %}>
+
+                                <button type="button"
+                                        class="btn btn-sm rounded-circle celda-toggle {% if celda.habilitado %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                                        style="width:2.25rem;height:2.25rem;padding:0;"
+                                        onclick="alternarCeldaDia('chk_{{ fila.competencia.id }}_{{ celda.dia }}', this)"
+                                        aria-label="{{ fila.competencia.nombre }} - {{ celda.dia }}">
+                                    <span class="celda-simbolo">{% if celda.habilitado %}●{% else %}○{% endif %}</span>
+                                </button>
+                            </td>
+                            {% endfor %}
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ dias_semana|length|add:1 }}" class="text-center text-muted">
+                                No existen competencias registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+            </div>
+
+            <p class="text-muted small mt-3 mb-4">
+                Haga clic en cada celda para habilitar o deshabilitar el día correspondiente para la competencia.
+            </p>
+
+            <!-- ===================================== -->
+            <!--          CANCELAR / GUARDAR            -->
+            <!-- ===================================== -->
+
+            <div class="d-flex justify-content-between align-items-center">
+
+                <!-- Enlace normal (no botón del form): al navegar fuera de la
+                     página se descarta cualquier celda tocada y no guardada,
+                     mismo criterio que "Cancelar" en el resto del proyecto. -->
+                <a href="{% url 'dias_atencion' %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+
+                <button type="submit" class="btn btn-primary">
+                    Guardar cambios
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- ========================================= -->
+<!--              JAVASCRIPT                    -->
+<!-- ========================================= -->
+<!-- Único script de esta página: alterna la apariencia y el checkbox
+     oculto de una celda al hacer clic, y mantiene ambos sincronizados
+     cuando se presiona "Restablecer por defecto". Sin dependencias
+     nuevas, sin petición adicional -el guardado real solo ocurre al
+     enviar el <form> completo con "Guardar cambios". -->
+
+<script>
+    function actualizarVisualCelda(checkbox, boton) {
+        const simbolo = boton.querySelector(".celda-simbolo");
+
+        if (checkbox.checked) {
+            boton.classList.remove("btn-outline-secondary");
+            boton.classList.add("btn-success");
+            simbolo.textContent = "●";
+        } else {
+            boton.classList.remove("btn-success");
+            boton.classList.add("btn-outline-secondary");
+            simbolo.textContent = "○";
+        }
+    }
+
+    function alternarCeldaDia(idCheckbox, boton) {
+        const checkbox = document.getElementById(idCheckbox);
+        checkbox.checked = !checkbox.checked;
+        actualizarVisualCelda(checkbox, boton);
+    }
+
+    document.getElementById("form-matriz-dias").addEventListener("reset", function () {
+        // El evento "reset" se dispara justo cuando el navegador ya
+        // restableció los checkboxes a su valor "checked" original;
+        // se recorren para sincronizar la apariencia de cada botón
+        // con ese valor.
+        document.querySelectorAll(".celda-dia").forEach(function (checkbox) {
+            actualizarVisualCelda(checkbox, checkbox.nextElementSibling);
+        });
+    });
+</script>
+
+{% endblock %}

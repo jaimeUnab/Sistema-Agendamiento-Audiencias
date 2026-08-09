@@ -1,0 +1,71 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior),
+     la misma que usan el Dashboard y el resto de los formularios del
+     sistema (por ejemplo, templates/salas/formulario.html).
+
+     Esta plantilla se reutiliza tanto para configurar (alta o
+     upsert) como para editar una regla de plazo legal: la vista
+     crear_regla_agendamiento no envía la clave "regla" en el
+     contexto (queda indefinida/falsa), mientras que
+     editar_regla_agendamiento sí la envía con la instancia cargada.
+     Eso es lo único que distingue un modo del otro aquí. -->
+
+{% block title %}
+{% if regla %}Editar Regla de Plazo Legal{% else %}Agregar Regla de Plazo Legal{% endif %}
+{% endblock %}
+
+{% block page_title %}
+Reglas de Agendamiento
+{% endblock %}
+
+{% block content %}
+
+{% include "reglas_agendamiento/_tabs.html" %}
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <h4>{% if regla %}Editar Regla de Plazo Legal{% else %}Agregar Regla de Plazo Legal{% endif %}</h4>
+
+                <hr>
+
+                <!-- Se utiliza exclusivamente {{ form }}: ReglaAgendamientoForm ya
+                     define sus campos y las validaciones del modelo -incluida la
+                     UniqueConstraint(competencia, tipoAudiencia)-, por lo que aquí
+                     no se vuelve a declarar ningún campo manualmente. -->
+
+                <form method="post">
+
+                    {% csrf_token %}
+
+                    {{ form }}
+
+                    <div class="mt-4">
+
+                        <button type="submit" class="btn btn-primary">
+                            {% if regla %}Guardar Cambios{% else %}Guardar{% endif %}
+                        </button>
+
+                        <!-- Cancelar regresa al listado sin guardar cambios -->
+                        <a href="{% url 'lista_reglas_agendamiento' %}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,30 @@
+# =====================================================
+# IMPORTACIONES
+# =====================================================
+
+from django.urls import path
+from . import views
+
+# =====================================================
+# URLS
+# =====================================================
+
+urlpatterns = [
+
+    # Registro de una nueva audiencia.
+    path("nueva/", views.registrar_audiencia, name="registrar_audiencia"),
+
+    # Solicitud de propuestas automáticas de fecha/bloques.
+    path("proponer/", views.proponer_fechas_audiencia, name="proponer_fechas_audiencia"),
+
+    # Consulta de disponibilidad de agenda (sala + fecha), de solo lectura.
+    path(
+        "disponibilidad/",
+        views.ver_disponibilidad_audiencia,
+        name="ver_disponibilidad_audiencia",
+    ),
+
+    # Agenda diaria: audiencias PROGRAMADAS de una fecha, de solo lectura.
+    path("agenda/", views.agenda_diaria, name="agenda_diaria"),
+
+]

@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'salas',
     'reglas_agendamiento',
     'dias_no_disponibles',
+    'causas',
+    'audiencias',
 
 ]
 

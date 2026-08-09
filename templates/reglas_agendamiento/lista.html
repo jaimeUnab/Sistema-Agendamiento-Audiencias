@@ -1,77 +1,123 @@
 {% extends 'base_dashboard.html' %}
-<!-- Hereda la estructura principal del sistema (menú lateral y barra superior) -->
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior).
+     Pestaña "Plazos Legales" del módulo "Reglas de Agendamiento":
+     listado con CRUD completo de ReglaAgendamiento (competencia,
+     tipo de audiencia, plazo mínimo, plazo máximo, unidad, activa),
+     siguiendo el mismo patrón visual y estructural que
+     templates/salas/lista.html y
+     templates/reglas_agendamiento/dias_atencion.html. -->
 
 {% block title %}
-Reglas de Agendamiento
+Reglas de Agendamiento - Plazos Legales
 {% endblock %}
-<!-- Título que aparecerá en la pestaña del navegador -->
 
 {% block page_title %}
 Reglas de Agendamiento
 {% endblock %}
-<!-- Título que se muestra en la barra superior de la página -->
 
 {% block content %}
-<!-- Aquí comienza el contenido propio de esta página -->
 
-<div class="row">
+{% include "reglas_agendamiento/_tabs.html" %}
 
-    <div class="col">
+<div class="card shadow-sm">
 
-        <div class="card shadow-sm">
+    <div class="card-body">
 
-            <div class="card-body">
+        <!-- ===================================== -->
+        <!--                BOTONES                 -->
+        <!-- ===================================== -->
 
-                <h4>Listado de reglas de agendamiento</h4>
+        <div class="d-flex justify-content-between align-items-center">
 
-                <hr>
+            <h5 class="mb-0">Plazos legales</h5>
 
-                <!-- Catálogo de solo lectura: únicamente muestra
-                     Competencia, Día de la semana y Estado, sin botones. -->
-                <table class="table table-hover align-middle">
-
-                    <thead>
-                        <tr>
-                            <th>Competencia</th>
-                            <th>Día de la semana</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-
-                        {% for regla in reglas %}
-                        <tr>
-                            <td>{{ regla.competencia }}</td>
-                            <td>{{ regla.get_diaSemana_display }}</td>
-                            <td>
-                                {% if regla.activa %}
-                                    <span class="badge bg-success">Activa</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Inactiva</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <!-- Mensaje mostrado cuando no existen reglas registradas -->
-                        <tr>
-                            <td colspan="3" class="text-center">
-                                No existen reglas de agendamiento registradas.
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
+            <!-- Botón que dirige a configurar una nueva regla (o editar una
+                 ya existente, si la combinación competencia+tipo de
+                 audiencia ya está configurada: ver
+                 crear_regla_agendamiento en views.py). -->
+            <a href="{% url 'crear_regla_agendamiento' %}" class="btn btn-primary">
+                + Agregar regla
+            </a>
 
         </div>
+
+        <hr>
+
+        <!-- Tabla con las reglas de plazo legal registradas en el sistema -->
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Competencia</th>
+                    <th>Tipo de audiencia</th>
+                    <th>Mínimo</th>
+                    <th>Máximo</th>
+                    <th>Unidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for regla in reglas %}
+                <tr>
+                    <td>{{ regla.competencia }}</td>
+                    <td>{{ regla.tipoAudiencia }}</td>
+                    <td>{{ regla.plazoMinimo }}</td>
+                    <td>{{ regla.plazoMaximo }}</td>
+                    <td>{{ regla.get_unidadPlazo_display }}</td>
+                    <td>
+                        {% if regla.activa %}
+                            <span class="badge bg-success">Activa</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- Botón que dirige a la edición de esta regla -->
+                        <a href="{% url 'editar_regla_agendamiento' regla.pk %}" class="btn btn-sm btn-warning me-1">
+                            Editar
+                        </a>
+
+                        <!-- Botón que activa/desactiva la regla (no la elimina
+                             físicamente: se conserva como configuración
+                             histórica). Usa un formulario POST -mismo
+                             criterio que Salas/Bloques/DiaAtencion- porque
+                             cambiar el estado modifica datos y no debe poder
+                             dispararse con un simple enlace GET. -->
+                        <form method="post" action="{% url 'cambiar_estado_regla_agendamiento' regla.pk %}" class="d-inline">
+
+                            {% csrf_token %}
+
+                            {% if regla.activa %}
+                                <button type="submit" class="btn btn-sm btn-secondary">
+                                    Desactivar
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    Activar
+                                </button>
+                            {% endif %}
+
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <!-- Mensaje mostrado cuando no existen reglas registradas -->
+                <tr>
+                    <td colspan="7" class="text-center">
+                        No existen reglas de plazo legal registradas.
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
 
     </div>
 
 </div>
 
 {% endblock %}
-<!-- Fin del contenido de la página -->

@@ -192,25 +192,20 @@
 
 
             <!-- Reglas de Agendamiento -->
-            <!-- Pendiente: funcionalidad aún no implementada. -->
+            <!-- Enlaza a la pestaña "General" del módulo unificado
+                 "Reglas de Agendamiento" (General / Plazos Legales /
+                 Asignación de días por competencia / Días Bloqueados,
+                 ver templates/reglas_agendamiento/_tabs.html). La
+                 administración de días no disponibles (antes un ítem
+                 aparte de este menú, "Días No Disponibles") quedó
+                 absorbida dentro de la pestaña "Días Bloqueados" de
+                 este mismo módulo, sin un enlace de menú propio. -->
 
-            <a href="#" class="menu-item">
+            <a href="{% url 'configuracion_general' %}" class="menu-item">
 
                 <i class="bi bi-clipboard-check"></i>
 
-                <span>Reglas de Agendamiento <small class="text-white-50">(pendiente)</small></span>
-
-            </a>
-
-
-            <!-- Días No Disponibles -->
-            <!-- Pendiente: funcionalidad aún no implementada. -->
-
-            <a href="#" class="menu-item">
-
-                <i class="bi bi-calendar-x"></i>
-
-                <span>Días No Disponibles <small class="text-white-50">(pendiente)</small></span>
+                <span>Reglas de Agendamiento</span>
 
             </a>
 

@@ -1,0 +1,116 @@
+{% extends 'base_dashboard.html' %}
+<!-- Reutiliza la misma estructura principal del sistema (menú lateral
+     y barra superior) que el resto de las pantallas, incluyendo
+     audiencias/formulario.html. Mismo criterio Bootstrap 5 y mismos
+     estilos de card/tabla ya usados en la tabla de "Disponibilidad de
+     agenda" de esa pantalla. -->
+
+{% block title %}
+Agenda diaria
+{% endblock %}
+
+{% block page_title %}
+Agenda diaria
+{% endblock %}
+
+{% block content %}
+
+<!-- ========================================= -->
+<!--   SELECTOR DE FECHA                        -->
+<!-- ========================================= -->
+<!-- method="get": esta pantalla es solo de consulta/lectura, no
+     modifica nada, por lo que la fecha viaja como parámetro de
+     consulta (?fecha=AAAA-MM-DD) y no como POST. Esto además permite
+     que la URL con una fecha específica se pueda volver a abrir o
+     compartir directamente. -->
+
+<form method="get" action="{% url 'agenda_diaria' %}" class="row g-3 align-items-end mb-4">
+
+    <div class="col-auto">
+        <label for="id_fecha" class="form-label">Fecha</label>
+        <input type="date"
+               id="id_fecha"
+               name="fecha"
+               value="{{ fecha|date:'Y-m-d' }}"
+               class="form-control">
+    </div>
+
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">
+            Ver agenda
+        </button>
+    </div>
+
+</form>
+
+<h5 class="mb-4">{{ fecha|date:"d/m/Y" }}</h5>
+
+<!-- ========================================= -->
+<!--   SIN AUDIENCIAS PARA LA FECHA COMPLETA    -->
+<!-- ========================================= -->
+
+{% if not hay_audiencias %}
+<p class="text-muted">
+    No hay audiencias programadas para esta fecha.
+</p>
+{% endif %}
+
+<!-- ========================================= -->
+<!--   UNA SECCIÓN POR SALA                     -->
+<!-- ========================================= -->
+<!-- Se muestran TODAS las salas existentes (Sala.objects.all(), sin
+     buscar ni filtrar ninguna otra), cada una con sus audiencias
+     PROGRAMADAS de la fecha seleccionada, o "Sin audiencias
+     programadas." si no tiene ninguna ese día. -->
+
+{% for item in agenda_por_sala %}
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <h6 class="fw-bold">{{ item.sala.nombre }}</h6>
+
+        <hr>
+
+        {% if item.audiencias %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>RIT</th>
+                        <th>Carátula</th>
+                        <th>Tipo de audiencia</th>
+                        <th>Cantidad de bloques</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for audiencia in item.audiencias %}
+                    <tr>
+                        <td>
+                            {{ audiencia.horaInicio|time:"H:i" }} -
+                            {{ audiencia.horaTermino|time:"H:i" }}
+                        </td>
+                        <td>{{ audiencia.causa.rit }}</td>
+                        <td>{{ audiencia.causa.caratulado }}</td>
+                        <td>{{ audiencia.tipoAudiencia.nombre }}</td>
+                        <td>{{ audiencia.cantidadBloques }}</td>
+                        <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">
+            Sin audiencias programadas.
+        </p>
+        {% endif %}
+
+    </div>
+
+</div>
+{% endfor %}
+
+{% endblock %}

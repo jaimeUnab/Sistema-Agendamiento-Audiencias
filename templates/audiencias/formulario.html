@@ -1,0 +1,424 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior),
+     la misma que usan el Dashboard y el resto de los formularios del
+     sistema, para mantener una identidad visual consistente en todo el
+     proyecto. El mockup aprobado para esta pantalla usa una barra de
+     navegación superior en vez de menú lateral; se mantiene el menú
+     lateral existente a propósito (cambiar la navegación global del
+     sistema afectaría a todas las demás pantallas, fuera del alcance
+     de "adaptar visualmente esta pantalla"). Lo que se reorganiza aquí
+     es la composición interna del contenido, siguiendo el mockup. -->
+
+{% block title %}
+Nueva Audiencia
+{% endblock %}
+
+{% block page_title %}
+Nueva Audiencia
+{% endblock %}
+
+{% block content %}
+
+<!-- Subtítulo/instrucción, tal como en el mockup. -->
+<p class="text-muted mb-4">
+    Seleccione los datos para buscar una fecha disponible.
+</p>
+
+<!-- Un único <form> cubre toda la pantalla: todos los campos deben
+     viajar juntos sin importar qué botón se presione ("Buscar causa",
+     "Ver disponibilidad", "Solicitar propuestas" o "Guardar
+     audiencia"). id="form-audiencia" además permite que el botón
+     "Confirmar programación" del card de advertencias (fuera de este
+     <form>) igual pueda enviarlo mediante form="form-audiencia". -->
+
+<form id="form-audiencia" method="post" action="{% url 'registrar_audiencia' %}">
+
+    {% csrf_token %}
+
+    {{ form.non_field_errors }}
+
+    <!-- ========================================= -->
+    <!--   FILA 1: COMPETENCIA / TIPO / SALA        -->
+    <!-- ========================================= -->
+    <!-- Tres selects en una misma fila, como en el mockup. -->
+
+    <div class="row g-3 mb-3">
+
+        <div class="col-md-4">
+            {{ form.competencia.label_tag }}
+            {{ form.competencia }}
+            {{ form.competencia.errors }}
+        </div>
+
+        <div class="col-md-4">
+            {{ form.tipoAudiencia.label_tag }}
+            {{ form.tipoAudiencia }}
+            {{ form.tipoAudiencia.errors }}
+        </div>
+
+        <div class="col-md-4">
+            {{ form.sala.label_tag }}
+            {{ form.sala }}
+            {{ form.sala.errors }}
+        </div>
+
+    </div>
+
+
+    <!-- ========================================= -->
+    <!--      NÚMERO DE CAUSA                       -->
+    <!-- ========================================= -->
+    <!-- La causa ya NO se elige desde una lista desplegable: el
+         funcionario escribe un RIT y presiona "Buscar causa". La
+         vista (audiencias/views.py) es quien busca la Causa real
+         mediante competencia+rit; este template solo muestra el
+         resultado (causa_encontrada), nunca decide la búsqueda. -->
+
+    <div class="card shadow-sm mb-3">
+
+        <div class="card-body">
+
+            <div class="row g-3 align-items-end">
+
+                <div class="col-md-5">
+                    {{ form.rit.label_tag }}
+                    <div class="d-flex gap-2">
+                        {{ form.rit }}
+                        <!-- formnovalidate: tipoAudiencia/sala/fecha/
+                             bloqueInicio -obligatorios para registrar-
+                             todavía pueden estar vacíos a propósito en
+                             este paso; sin formnovalidate el navegador
+                             bloquearía el envío exigiéndolos.
+                             name="buscar_causa" value="1": así
+                             distingue la vista este envío del de
+                             "Guardar audiencia" (mismo <form>, misma
+                             URL). -->
+                        <button type="submit"
+                                name="buscar_causa"
+                                value="1"
+                                formnovalidate
+                                class="btn btn-outline-secondary text-nowrap">
+                            Buscar causa
+                        </button>
+                    </div>
+                    {{ form.rit.errors }}
+                </div>
+
+                <!-- Solo se muestra cuando la vista encontró una
+                     Causa. RUC, carátula y materia se muestran como
+                     texto, no como campos editables. "Materia" usa
+                     causa_encontrada.competencia.nombre: Causa no
+                     tiene un campo "materia" propio, pero su
+                     competencia representa exactamente ese dato. -->
+                {% if causa_encontrada %}
+                <div class="col-md-7">
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <small class="text-muted d-block">Carátula</small>
+                            <span>{{ causa_encontrada.caratulado }}</span>
+                        </div>
+                        <div class="col-sm-3">
+                            <small class="text-muted d-block">Materia</small>
+                            <span>{{ causa_encontrada.competencia.nombre }}</span>
+                        </div>
+                        <div class="col-sm-3">
+                            <small class="text-muted d-block">RUC</small>
+                            <span>{{ causa_encontrada.ruc }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ========================================= -->
+    <!--   FECHA  +  DISPONIBILIDAD DE AGENDA       -->
+    <!-- ========================================= -->
+
+    <div class="row g-3">
+
+        <!-- ----------------------------------------------- -->
+        <!--   COLUMNA IZQUIERDA: SELECCIÓN MANUAL DE FECHA   -->
+        <!-- ----------------------------------------------- -->
+
+        <div class="col-md-4">
+
+            <div class="card shadow-sm h-100">
+
+                <div class="card-body">
+
+                    <h6 class="fw-bold">Selección manual de fecha</h6>
+
+                    <hr>
+
+                    {{ form.fecha.label_tag }}
+                    {{ form.fecha }}
+                    {{ form.fecha.errors }}
+
+                    <!-- formnovalidate: solo necesita sala+fecha, el
+                         resto del formulario puede seguir incompleto. -->
+                    <button type="submit"
+                            formaction="{% url 'ver_disponibilidad_audiencia' %}"
+                            formnovalidate
+                            class="btn btn-outline-primary mt-3 w-100">
+                        Ver disponibilidad
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ----------------------------------------------- -->
+        <!--   COLUMNA DERECHA: DISPONIBILIDAD DE AGENDA      -->
+        <!--   + CONFIGURACIÓN DE LA AUDIENCIA (bloques)      -->
+        <!-- ----------------------------------------------- -->
+
+        <div class="col-md-8">
+
+            <div class="card shadow-sm h-100">
+
+                <div class="card-body">
+
+                    <h6 class="fw-bold">
+                        Disponibilidad de agenda
+                        {% if sala_disponibilidad %}- {{ sala_disponibilidad }}{% endif %}
+                    </h6>
+
+                    <hr>
+
+                    <!-- Consulta de solo lectura (ver_disponibilidad_audiencia):
+                         no decide qué bloques proponer ni valida nada, solo
+                         muestra qué audiencias ya ocupan cada bloque de la
+                         sala y fecha seleccionadas. El funcionario sigue
+                         eligiendo manualmente "Bloque de inicio" más abajo. -->
+                    {% if disponibilidad %}
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>RIT</th>
+                                    <th>Carátula</th>
+                                    <th>Tipo de audiencia</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in disponibilidad %}
+                                <tr>
+                                    <td>{{ item.bloque.horaInicio|time:"H:i" }}</td>
+                                    {% if item.audiencia %}
+                                        <td>{{ item.audiencia.causa.rit }}</td>
+                                        <td>{{ item.audiencia.causa.caratulado }}</td>
+                                        <td>{{ item.audiencia.tipoAudiencia.nombre }}</td>
+                                        <td><span class="badge bg-danger">Ocupado</span></td>
+                                    {% else %}
+                                        <td>—</td>
+                                        <td>—</td>
+                                        <td>—</td>
+                                        <td><span class="badge bg-success">Disponible</span></td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">
+                        Selecciona sala y fecha, y presiona "Ver disponibilidad"
+                        para consultar la agenda.
+                    </p>
+                    {% endif %}
+
+                    <!-- ============================= -->
+                    <!--  CONFIGURACIÓN DE LA AUDIENCIA -->
+                    <!-- ============================= -->
+                    <!-- bloqueInicio + cantidadBloques: la misma decisión de
+                         diseño de siempre. horaInicio/horaTermino NO se
+                         calculan ni se muestran aquí -las calcula
+                         ServicioCreacionAudiencia a partir de estos dos
+                         valores, recién al guardar-, así que no hay ningún
+                         detalle técnico adicional que mostrar: el
+                         funcionario entiende el horario resultante mirando
+                         la tabla de disponibilidad de arriba. -->
+
+                    <div class="border rounded p-3 bg-light">
+
+                        <h6 class="fw-bold mb-3">Configuración de la audiencia</h6>
+
+                        <div class="row g-3">
+
+                            <div class="col-sm-8">
+                                {{ form.bloqueInicio.label_tag }}
+                                {{ form.bloqueInicio }}
+                                {{ form.bloqueInicio.errors }}
+                            </div>
+
+                            <div class="col-sm-4">
+                                {{ form.cantidadBloques.label_tag }}
+                                {{ form.cantidadBloques }}
+                                {{ form.cantidadBloques.errors }}
+                            </div>
+
+                        </div>
+
+                        <!-- formnovalidate: fecha/bloqueInicio pueden seguir
+                             vacíos a propósito en este paso (es lo que las
+                             propuestas ayudan a decidir). -->
+                        <button type="submit"
+                                formaction="{% url 'proponer_fechas_audiencia' %}"
+                                formnovalidate
+                                class="btn btn-outline-primary mt-3">
+                            Solicitar propuestas
+                        </button>
+
+                    </div>
+
+                    <!-- Propuestas automáticas (GeneradorPropuestaFecha),
+                         solo si se solicitaron. -->
+                    {% if propuestas %}
+                    <div class="mt-3">
+                        {% for propuesta in propuestas %}
+                        <div class="border rounded p-3 mb-2">
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Propuesta {{ forloop.counter }}</strong>
+                                {% if propuesta.fueraDePlazo %}
+                                    <span class="badge bg-warning text-dark">Fuera de plazo legal</span>
+                                {% endif %}
+                            </div>
+
+                            <p class="mb-1">
+                                {{ propuesta.fecha|date:"d/m/Y" }} ·
+                                {{ propuesta.horaInicio|time:"H:i" }} - {{ propuesta.horaTermino|time:"H:i" }} ·
+                                {{ propuesta.sala }} · {{ propuesta.cantidadBloques }} bloque(s)
+                            </p>
+
+                            {% for advertencia_propuesta in propuesta.advertencias %}
+                                <p class="text-warning mb-1">{{ advertencia_propuesta }}</p>
+                            {% endfor %}
+
+                            <!-- Botón type="button": no envía nada ni recarga
+                                 la página, solo completa fecha/bloqueInicio
+                                 del formulario principal mediante JavaScript.
+                                 El funcionario sigue pudiendo modificarlos
+                                 antes de guardar. -->
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-success"
+                                    data-fecha="{{ propuesta.fecha|date:'Y-m-d' }}"
+                                    data-bloque="{{ propuesta.bloqueInicio.pk }}"
+                                    onclick="usarPropuesta(this)">
+                                Usar esta propuesta
+                            </button>
+
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ========================================= -->
+    <!--   ADVERTENCIAS Y CONFIRMACIÓN              -->
+    <!-- ========================================= -->
+    <!-- Solo se muestra cuando ServicioCreacionAudiencia devolvió
+         requiereConfirmacion=True: hay advertencias de negocio
+         (ValidadorAgendamiento) pero ningún error bloqueante. Las
+         advertencias no impiden guardar; solo se pide confirmación
+         explícita antes de continuar. -->
+
+    {% if requiere_confirmacion %}
+    <div class="card shadow-sm mt-3 border-warning">
+
+        <div class="card-body">
+
+            <h6 class="fw-bold">Advertencias de programación</h6>
+
+            <hr>
+
+            <ul>
+                {% for advertencia in advertencias %}
+                    <li>{{ advertencia }}</li>
+                {% endfor %}
+            </ul>
+
+            <p>
+                Se encontraron advertencias. ¿Está seguro de que desea
+                programar la audiencia?
+            </p>
+
+            <!-- Cancelar vuelve al formulario vacío, sin guardar nada. -->
+            <a href="{% url 'registrar_audiencia' %}" class="btn btn-secondary">
+                Cancelar
+            </a>
+
+            <!-- Confirmar reenvía el MISMO formulario principal
+                 (form="form-audiencia"), agregando
+                 name="confirmar_advertencias" value="1" -solo en este
+                 botón-: la vista interpreta esa clave para volver a
+                 ejecutar ServicioCreacionAudiencia con
+                 confirmarAdvertencias=True. La segunda petición vuelve
+                 a validar todo desde cero (no se reutiliza este
+                 resultado); esta plantilla no guarda nada por su
+                 cuenta. -->
+            <button type="submit"
+                    form="form-audiencia"
+                    name="confirmar_advertencias"
+                    value="1"
+                    class="btn btn-warning">
+                Confirmar programación
+            </button>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+
+    <!-- ========================================= -->
+    <!--   VOLVER  /  GUARDAR AUDIENCIA              -->
+    <!-- ========================================= -->
+
+    <div class="d-flex justify-content-between align-items-center mt-4">
+
+        <a href="{% url 'inicio' %}" class="btn btn-link ps-0">
+            &larr; Volver
+        </a>
+
+        <button type="submit" class="btn btn-primary">
+            Guardar audiencia
+        </button>
+
+    </div>
+
+</form>
+
+<!-- ========================================= -->
+<!--              JAVASCRIPT                    -->
+<!-- ========================================= -->
+<!-- Único script de esta página: completa fecha/bloqueInicio del
+     formulario principal a partir de los data-* de la propuesta
+     elegida. Sin dependencias nuevas, sin petición adicional. -->
+
+<script>
+    function usarPropuesta(boton) {
+        document.getElementById("id_fecha").value = boton.dataset.fecha;
+        document.getElementById("id_bloqueInicio").value = boton.dataset.bloque;
+    }
+</script>
+
+{% endblock %}

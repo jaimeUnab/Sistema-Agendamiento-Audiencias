@@ -1,0 +1,120 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra superior).
+     Pestaña "Días Bloqueados" del módulo "Reglas de Agendamiento":
+     listado con CRUD completo de DiaNoDisponible (fecha, tipo,
+     motivo, activo), siguiendo el mismo patrón visual y estructural
+     que templates/reglas_agendamiento/lista.html y
+     templates/salas/lista.html. Solo se muestran los campos que
+     realmente tiene el modelo: no existe un campo "Descripción" u
+     "Observación" separado de "motivo". -->
+
+{% block title %}
+Reglas de Agendamiento - Días Bloqueados
+{% endblock %}
+
+{% block page_title %}
+Reglas de Agendamiento
+{% endblock %}
+
+{% block content %}
+
+{% include "reglas_agendamiento/_tabs.html" %}
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <!-- ===================================== -->
+        <!--                BOTONES                 -->
+        <!-- ===================================== -->
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <h5 class="mb-0">Días bloqueados</h5>
+
+            <!-- Botón que dirige a registrar un nuevo día bloqueado (o
+                 editar uno ya existente, si la fecha ya está registrada:
+                 ver crear_dia_no_disponible en views.py). -->
+            <a href="{% url 'crear_dia_no_disponible' %}" class="btn btn-primary">
+                + Agregar día bloqueado
+            </a>
+
+        </div>
+
+        <hr>
+
+        <!-- Tabla con los días no disponibles registrados en el sistema -->
+        <table class="table table-hover align-middle">
+
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Motivo</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for dia in dias_no_disponibles %}
+                <tr>
+                    <td>{{ dia.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ dia.get_tipo_display }}</td>
+                    <td>{{ dia.motivo }}</td>
+                    <td>
+                        {% if dia.activo %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <!-- Botón que dirige a la edición de este día bloqueado -->
+                        <a href="{% url 'editar_dia_no_disponible' dia.pk %}" class="btn btn-sm btn-warning me-1">
+                            Editar
+                        </a>
+
+                        <!-- Botón que activa/desactiva el día bloqueado (no lo
+                             elimina físicamente: se conserva como
+                             configuración histórica). Usa un formulario POST
+                             -mismo criterio que Salas/Bloques/DiaAtencion/
+                             ReglaAgendamiento- porque cambiar el estado
+                             modifica datos y no debe poder dispararse con un
+                             simple enlace GET. -->
+                        <form method="post" action="{% url 'cambiar_estado_dia_no_disponible' dia.pk %}" class="d-inline">
+
+                            {% csrf_token %}
+
+                            {% if dia.activo %}
+                                <button type="submit" class="btn btn-sm btn-secondary">
+                                    Desactivar
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    Activar
+                                </button>
+                            {% endif %}
+
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <!-- Mensaje mostrado cuando no existen días bloqueados registrados -->
+                <tr>
+                    <td colspan="5" class="text-center">
+                        No existen días bloqueados registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

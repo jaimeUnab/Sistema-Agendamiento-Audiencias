@@ -1,8 +1,14 @@
 """
 Módulo de modelos de la aplicación Bloques.
 
-Contiene el modelo BloqueHorario, que representa el
-horario oficial de audiencias del tribunal.
+Contiene dos modelos:
+
+- BloqueHorario: representa el horario oficial de audiencias
+  del tribunal (bloques concretos).
+- ConfiguracionAgendamiento: parámetros generales del
+  tribunal para el agendamiento (jornada, duración de bloque,
+  horizonte de búsqueda). Es configuración global, con una
+  única instancia posible.
 """
 
 # =====================================================
@@ -77,3 +83,66 @@ class BloqueHorario(models.Model):
             f"({self.horaInicio.strftime('%H:%M')} - "
             f"{self.horaTermino.strftime('%H:%M')})"
         )
+
+
+# =====================================================
+# MODELO: CONFIGURACIÓN GENERAL DE AGENDAMIENTO
+# =====================================================
+
+class ConfiguracionAgendamiento(models.Model):
+    """
+    Parámetros generales de agendamiento del tribunal.
+
+    Son comunes para todo el tribunal: no dependen de una
+    competencia ni de un tipo de audiencia (esos casos ya
+    están cubiertos por ReglaAgendamiento y DiaAtencion, en
+    la app reglas_agendamiento).
+
+    Existe una única instancia posible de este modelo (ver
+    "claveUnica" más abajo).
+    """
+
+    # Hora de inicio de la jornada del tribunal.
+    horaInicioJornada = models.TimeField(
+        verbose_name="Hora de inicio de la jornada"
+    )
+
+    # Hora de término de la jornada del tribunal.
+    horaTerminoJornada = models.TimeField(
+        verbose_name="Hora de término de la jornada"
+    )
+
+    # Duración de cada bloque horario, en minutos.
+    duracionBloque = models.PositiveIntegerField(
+        verbose_name="Duración del bloque (minutos)"
+    )
+
+    # Cantidad de días que el sistema considera al buscar
+    # automáticamente fechas disponibles para una audiencia.
+    horizonteBusquedaDias = models.PositiveIntegerField(
+        verbose_name="Horizonte de búsqueda (días)"
+    )
+
+    # -------------------------------------------------
+    # GARANTÍA DE INSTANCIA ÚNICA
+    # -------------------------------------------------
+    # Campo técnico, no editable desde formularios. Al tener
+    # un valor por defecto fijo (1) y ser unique=True, la
+    # base de datos rechaza cualquier segundo registro: un
+    # segundo INSERT también intentaría guardar claveUnica=1
+    # y violaría la restricción de unicidad. Esta es una
+    # garantía real a nivel de base de datos, no solo de la
+    # aplicación.
+    claveUnica = models.PositiveSmallIntegerField(
+        default=1,
+        unique=True,
+        editable=False,
+        verbose_name="Clave única (uso interno)"
+    )
+
+    def __str__(self):
+        """
+        Como solo puede existir una instancia, se identifica
+        con un nombre fijo y descriptivo.
+        """
+        return "Configuración general de agendamiento"

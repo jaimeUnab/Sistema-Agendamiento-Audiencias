@@ -2,8 +2,7 @@
 Módulo de modelos de la aplicación Tipos de Audiencia.
 
 Contiene el modelo TipoAudiencia, que define los tipos de
-audiencia disponibles para cada competencia, junto con sus
-plazos legales de agendamiento.
+audiencia disponibles en el sistema.
 """
 
 # =====================================================
@@ -12,22 +11,6 @@ plazos legales de agendamiento.
 
 from django.db import models
 
-from competencias.models import Competencia
-
-
-# =====================================================
-# ENUMERACIONES
-# =====================================================
-
-class TipoPlazo(models.TextChoices):
-    """
-    Define si el plazo de un tipo de audiencia se cuenta
-    en días hábiles o en días corridos.
-    """
-
-    HABIL = "HABIL", "Hábil"
-    CORRIDO = "CORRIDO", "Corrido"
-
 
 # =====================================================
 # MODELO
@@ -35,30 +18,20 @@ class TipoPlazo(models.TextChoices):
 
 class TipoAudiencia(models.Model):
     """
-    Representa un tipo de audiencia asociado a una
-    competencia, junto con sus plazos legales de
-    agendamiento.
+    Representa un tipo de audiencia.
 
-    El nombre no es único globalmente: distintas
-    competencias pueden tener tipos de audiencia con el
-    mismo nombre, pero una misma competencia no puede
-    repetir el mismo nombre dos veces (ver UniqueConstraint
-    en Meta).
+    Es un catálogo transversal: ya no está asociado a una
+    competencia específica (antes lo estaba). El plazo legal
+    de cada tipo de audiencia depende de la combinación
+    Competencia + TipoAudiencia, y se define en
+    ReglaAgendamiento (app reglas_agendamiento), no aquí.
     """
 
-    # Competencia a la que pertenece este tipo de audiencia.
-    # PROTECT: no se permite eliminar una competencia que
-    # todavía tenga tipos de audiencia asociados.
-    competencia = models.ForeignKey(
-        Competencia,
-        on_delete=models.PROTECT,
-        related_name="tipos_audiencia",
-        verbose_name="Competencia"
-    )
-
-    # Nombre del tipo de audiencia.
+    # Nombre del tipo de audiencia. Único, ya que ahora es un
+    # catálogo transversal (no está acotado por competencia).
     nombre = models.CharField(
         max_length=100,
+        unique=True,
         verbose_name="Nombre"
     )
 
@@ -66,29 +39,6 @@ class TipoAudiencia(models.Model):
     descripcion = models.TextField(
         blank=True,
         verbose_name="Descripción"
-    )
-
-    # Plazo mínimo, en días, para agendar este tipo de audiencia.
-    plazoMinimoDias = models.PositiveIntegerField(
-        verbose_name="Plazo mínimo (días)"
-    )
-
-    # Plazo máximo, en días, para agendar este tipo de audiencia.
-    plazoMaximoDias = models.PositiveIntegerField(
-        verbose_name="Plazo máximo (días)"
-    )
-
-    # Horizonte de búsqueda, en días, utilizado más adelante
-    # para proponer fechas disponibles.
-    horizonteBusquedaDias = models.PositiveIntegerField(
-        verbose_name="Horizonte de búsqueda (días)"
-    )
-
-    # Indica si el plazo se cuenta en días hábiles o corridos.
-    tipoPlazo = models.CharField(
-        max_length=10,
-        choices=TipoPlazo.choices,
-        verbose_name="Tipo de plazo"
     )
 
     # Indica si el tipo de audiencia está actualmente vigente.
@@ -102,21 +52,13 @@ class TipoAudiencia(models.Model):
     # =================================================
 
     class Meta:
-        # Una misma competencia no puede repetir el mismo
-        # nombre de tipo de audiencia dos veces.
-        constraints = [
-            models.UniqueConstraint(
-                fields=["competencia", "nombre"],
-                name="unique_tipo_audiencia_por_competencia"
-            )
-        ]
-
-        # Ordena automáticamente por competencia y nombre.
-        ordering = ["competencia", "nombre"]
+        # Ordena automáticamente por nombre. Antes se ordenaba
+        # también por competencia, pero ese campo ya no existe
+        # en este modelo.
+        ordering = ["nombre"]
 
     def __str__(self):
         """
-        Devuelve "Competencia - Nombre", por ejemplo:
-        "Familia - Preparatoria".
+        Devuelve el nombre del tipo de audiencia.
         """
-        return f"{self.competencia} - {self.nombre}"
+        return self.nombre

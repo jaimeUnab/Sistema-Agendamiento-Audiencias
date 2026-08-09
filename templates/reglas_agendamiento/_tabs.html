@@ -1,0 +1,55 @@
+<!-- =====================================================
+     PARTIAL: encabezado + pestañas de "Reglas de Agendamiento"
+     =====================================================
+     Se incluye al inicio del bloque de contenido de las 8 páginas
+     de este módulo (listados y formularios de las 4 categorías),
+     para que las 4 URLs/vistas independientes se vean y se sientan
+     como un único módulo, tal como en el mockup original.
+
+     Requiere que la vista que renderiza la página pase
+     "pestana_activa" en el contexto, con uno de estos valores:
+     "general", "plazos", "dias_atencion", "dias_bloqueados".
+     La pestaña correspondiente queda marcada como activa; las
+     demás quedan como enlaces normales, cada una a su URL real
+     (sin cambiar ningún nombre de URL existente). -->
+
+<h4 class="mb-1">Reglas de Agendamiento</h4>
+<p class="text-muted mb-4">
+    Configure las reglas generales que se aplican en todo el sistema de agendamiento.
+</p>
+
+<ul class="nav nav-tabs mb-4">
+
+    <li class="nav-item">
+        <a class="nav-link {% if pestana_activa == 'general' %}active{% endif %}"
+           href="{% url 'configuracion_general' %}">
+            <i class="bi bi-gear"></i>
+            General
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="nav-link {% if pestana_activa == 'plazos' %}active{% endif %}"
+           href="{% url 'lista_reglas_agendamiento' %}">
+            <i class="bi bi-hourglass-split"></i>
+            Plazos Legales
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="nav-link {% if pestana_activa == 'dias_atencion' %}active{% endif %}"
+           href="{% url 'dias_atencion' %}">
+            <i class="bi bi-calendar-week"></i>
+            Asignación de días por competencia
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="nav-link {% if pestana_activa == 'dias_bloqueados' %}active{% endif %}"
+           href="{% url 'dias_bloqueados' %}">
+            <i class="bi bi-calendar-x"></i>
+            Días Bloqueados
+        </a>
+    </li>
+
+</ul>
