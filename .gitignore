@@ -16,3 +16,9 @@ __pycache__/
 
 # Logs
 *.log
+# Configuración local de Claude
+.claude/
+
+# Respaldos locales
+backups/
+*_Backup_*.zip

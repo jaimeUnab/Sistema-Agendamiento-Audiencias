@@ -68,19 +68,25 @@ Inicio
 
                 <hr>
 
+                <!-- Antes eran <button> sueltos, sin href ni acción: no
+                     navegaban a ningún lado. Las tres vistas ya existen
+                     (registrar_audiencia y agenda_diaria en la app
+                     audiencias, lista_usuarios en la app usuarios); solo
+                     faltaba conectarlas. Mismas clases/tamaño/colores de
+                     botón de siempre, ahora como enlaces reales. -->
                 <div class="d-flex gap-3 flex-wrap">
 
-                    <button class="btn btn-primary">
+                    <a href="{% url 'registrar_audiencia' %}" class="btn btn-primary">
                         Nueva Audiencia
-                    </button>
+                    </a>
 
-                    <button class="btn btn-success">
+                    <a href="{% url 'agenda_diaria' %}" class="btn btn-success">
                         Agenda
-                    </button>
+                    </a>
 
-                    <button class="btn btn-secondary">
+                    <a href="{% url 'lista_usuarios' %}" class="btn btn-secondary">
                         Usuarios
-                    </button>
+                    </a>
 
                 </div>
 

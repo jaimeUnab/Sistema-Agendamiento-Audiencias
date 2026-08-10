@@ -361,11 +361,31 @@ class ValidadorAgendamiento:
                 "habitual de atención para esta competencia."
             )
 
-        if DiaNoDisponible.objects.filter(fecha=a.fecha, activo=True).exists():
-            self.advertencias.append(
-                "El día seleccionado se encuentra marcado como no "
-                "disponible."
-            )
+        # fecha es unique=True en DiaNoDisponible (ver
+        # dias_no_disponibles/models.py): nunca puede haber más
+        # de un registro para la misma fecha, así que .first()
+        # sobre este filtro devuelve como máximo uno, sin
+        # necesidad de decidir entre varios.
+        dia_no_disponible = DiaNoDisponible.objects.filter(
+            fecha=a.fecha, activo=True
+        ).first()
+
+        if dia_no_disponible is not None:
+            motivo = dia_no_disponible.motivo.strip()
+
+            if motivo:
+                self.advertencias.append(
+                    "El día seleccionado se encuentra marcado como no "
+                    f"disponible. Motivo: {motivo}."
+                )
+            else:
+                # Registro existente pero sin motivo cargado: se
+                # mantiene exactamente el mensaje original, sin
+                # agregar "Motivo:" vacío.
+                self.advertencias.append(
+                    "El día seleccionado se encuentra marcado como no "
+                    "disponible."
+                )
 
 
 # =====================================================

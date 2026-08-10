@@ -34,11 +34,19 @@ def lista_tipos_audiencia(request):
     """
 
     # -------------------------------------------------
-    # Obtiene todos los tipos de audiencia ordenados
-    # por competencia y nombre.
+    # Obtiene todos los tipos de audiencia ordenados por
+    # nombre. Antes también se ordenaba por "competencia",
+    # pero TipoAudiencia ya no tiene ese campo: es un
+    # catálogo transversal desde que se repurposó (ver
+    # tipos_audiencia/models.py), y ese order_by quedó
+    # desactualizado, provocando un FieldError al usar esta
+    # vista. Coincide con Meta.ordering = ["nombre"] del
+    # propio modelo; se deja explícito aquí, mismo criterio
+    # que el resto de los listados del proyecto (por ejemplo
+    # lista_salas).
     # -------------------------------------------------
 
-    tipos_audiencia = TipoAudiencia.objects.all().order_by("competencia", "nombre")
+    tipos_audiencia = TipoAudiencia.objects.all().order_by("nombre")
 
     # -------------------------------------------------
     # Envía la información a la plantilla HTML.

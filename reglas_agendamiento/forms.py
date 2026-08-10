@@ -76,6 +76,32 @@ class ConfiguracionAgendamientoForm(forms.ModelForm):
     todavía no existe ninguna- al construir este formulario.
     """
 
+    # Duración de cada bloque horario, en minutos. Declarado
+    # explícitamente (en vez de dejar que ModelForm genere el
+    # IntegerField por defecto para este campo del modelo) para
+    # que sea un Select con únicamente las opciones 15/30/45/60,
+    # y para que esa restricción se valide de verdad en el
+    # servidor: TypedChoiceField rechaza cualquier valor que no
+    # esté en "choices" con un error de validación ("Escoja una
+    # opción válida..."), no es solo una pista visual del
+    # navegador. Mismo patrón ya usado en
+    # audiencias/forms.py:AudienciaForm.cantidadBloques.
+    # coerce=int asegura que cleaned_data["duracionBloque"] siga
+    # siendo un int, igual que antes, para que el resto del
+    # sistema (y el propio modelo, un PositiveIntegerField) lo
+    # reciba sin ningún cambio; no fue necesario modificar el
+    # modelo ni ninguna migración.
+    duracionBloque = forms.TypedChoiceField(
+        choices=[
+            (15, "15 minutos"),
+            (30, "30 minutos"),
+            (45, "45 minutos"),
+            (60, "60 minutos"),
+        ],
+        coerce=int,
+        label="Duración del bloque (minutos)",
+    )
+
     class Meta:
         model = ConfiguracionAgendamiento
 

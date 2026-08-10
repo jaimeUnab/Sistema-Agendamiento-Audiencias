@@ -40,16 +40,22 @@ Tipos de Audiencia
 
                 <hr>
 
-                <!-- Tabla con los tipos de audiencia registrados en el sistema -->
+                <!-- Tabla con los tipos de audiencia registrados en el sistema.
+                     Columnas alineadas con los campos reales que TipoAudiencia
+                     tiene hoy (nombre, descripcion, activo): ya no muestra
+                     "Competencia" ni columnas de plazo ("Plazo mínimo/máximo",
+                     "Tipo de plazo"), porque ese campo y esos datos no existen
+                     en este modelo desde que se convirtió en catálogo
+                     transversal (el plazo legal ahora vive en ReglaAgendamiento,
+                     app reglas_agendamiento, por combinación de Competencia +
+                     TipoAudiencia). Mismo card/tabla/badges de siempre, sin
+                     ningún cambio de diseño visual. -->
                 <table class="table table-hover align-middle">
 
                     <thead>
                         <tr>
-                            <th>Competencia</th>
                             <th>Nombre</th>
-                            <th>Plazo mínimo</th>
-                            <th>Plazo máximo</th>
-                            <th>Tipo de plazo</th>
+                            <th>Descripción</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
@@ -59,16 +65,13 @@ Tipos de Audiencia
 
                         {% for tipo in tipos_audiencia %}
                         <tr>
-                            <td>{{ tipo.competencia }}</td>
                             <td>{{ tipo.nombre }}</td>
-                            <td>{{ tipo.plazoMinimoDias }}</td>
-                            <td>{{ tipo.plazoMaximoDias }}</td>
-                            <td>{{ tipo.get_tipoPlazo_display }}</td>
+                            <td>{{ tipo.descripcion }}</td>
                             <td>
                                 {% if tipo.activo %}
-                                    <span class="badge bg-success">Activa</span>
+                                    <span class="badge bg-success">Activo</span>
                                 {% else %}
-                                    <span class="badge bg-secondary">Inactiva</span>
+                                    <span class="badge bg-secondary">Inactivo</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -82,7 +85,7 @@ Tipos de Audiencia
                         {% empty %}
                         <!-- Mensaje mostrado cuando no existen tipos de audiencia registrados -->
                         <tr>
-                            <td colspan="7" class="text-center">
+                            <td colspan="4" class="text-center">
                                 No existen tipos de audiencia registrados.
                             </td>
                         </tr>

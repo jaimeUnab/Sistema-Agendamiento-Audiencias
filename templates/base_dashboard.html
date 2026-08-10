@@ -62,12 +62,36 @@
     <aside class="sidebar">
 
         <!-- Logo del sistema -->
+        <!--
+            Balanza de la justicia: imagen provista por el usuario,
+            guardada en static/img/icono programa.png (Bootstrap Icons
+            no tiene ningún ícono de balanza/justicia -se verificó
+            contra el repositorio oficial-, así que no se usa una clase
+            "bi bi-xxx"; tampoco se agrega ninguna librería nueva, es
+            solo un archivo de imagen servido como estático).
+
+            La imagen es de 1536x1024px (no cuadrada): un círculo con
+            resplandor azul centrado casi exactamente en el medio del
+            lienzo. ".logo" pasa de ser un círculo con fondo/borde
+            propios (rgba blanco + borde blanco, dibujados en CSS) a
+            ser solo un CONTENEDOR circular que recorta la imagen
+            (overflow:hidden + border-radius:50%): el círculo, el
+            borde blanco y el color visibles ahora los aporta la
+            propia imagen, no un fondo/borde de ".logo" superpuesto
+            -mantener ambos a la vez dibujaría un anillo doble-. El
+            recorte a cuadrado (object-fit:cover) cae casi
+            perfectamente sobre el círculo de la imagen: se verificó
+            con Pillow que el resplandor ya ocupa casi todo el alto
+            del lienzo, así que el recorte horizontal a cuadrado no
+            corta el círculo, solo el margen negro sobrante a los
+            costados.
+        -->
 
         <div class="sidebar-header">
 
             <div class="logo">
 
-                <i class="bi bi-bank2"></i>
+                <img src="{% static 'img/icono programa.png' %}" alt="Balanza de la justicia">
 
             </div>
 
@@ -100,8 +124,11 @@
 
 
             <!-- Agenda -->
+            <!-- Antes href="#" (pendiente): la vista agenda_diaria ya
+                 existe (app audiencias) desde hace varias tareas, pero
+                 el enlace del menú nunca se conectó a ella. -->
 
-            <a href="#" class="menu-item">
+            <a href="{% url 'agenda_diaria' %}" class="menu-item">
 
                 <i class="bi bi-calendar3"></i>
 
@@ -111,8 +138,11 @@
 
 
             <!-- Nueva audiencia -->
+            <!-- Antes href="#" (pendiente): la vista registrar_audiencia
+                 ya existe (app audiencias) desde hace varias tareas, pero
+                 el enlace del menú nunca se conectó a ella. -->
 
-            <a href="#" class="menu-item">
+            <a href="{% url 'registrar_audiencia' %}" class="menu-item">
 
                 <i class="bi bi-plus-circle"></i>
 
@@ -122,146 +152,198 @@
 
 
             <!-- ================================================= -->
-            <!--             SECCIÓN: CONFIGURACIÓN                -->
+            <!--       SECCIÓN COLAPSABLE: CONFIGURACIÓN           -->
             <!-- ================================================= -->
             <!--
-                Agrupa visualmente los mantenedores/catálogos del
-                sistema. Es solo un encabezado de texto (usa clases
-                utilitarias de Bootstrap ya cargado por el proyecto,
-                sin agregar ningún archivo CSS nuevo).
+                Agrupa los mismos seis mantenedores/catálogos que ya
+                existían en esta sección, ahora dentro de un menú
+                desplegable (Bootstrap Collapse, ya cargado por el
+                proyecto vía bootstrap.bundle.min.js: no se agrega
+                ninguna librería nueva). El encabezado reutiliza la
+                misma clase "menu-item" que el resto de las opciones
+                del menú (mismo color, tamaño, hover y espaciado): no
+                se rediseña nada, solo se le agrega el comportamiento
+                de apertura/cierre (data-bs-toggle="collapse", con
+                <a href="#..."> -Bootstrap evita que el navegador
+                salte al ancla-) y una flecha indicadora al final del
+                texto.
+
+                La condición repetida abajo -"¿la página actual
+                pertenece a alguno de estos seis mantenedores?",
+                verificada por el prefijo de su URL, sin enumerar
+                cada nombre de URL uno por uno- decide, sin tocar
+                ninguna vista ni urls.py:
+                - si el menú aparece expandido desde la carga de la
+                  página, sin necesidar de un clic (punto 2 pedido);
+                - si el encabezado "Configuración" queda marcado
+                  "active" (parte del punto 3 pedido).
+                Cada enlace hijo, más abajo, usa la misma técnica de
+                forma individual (con su propio prefijo) para marcar
+                cuál de los seis quedó "active" (resto del punto 3).
+
+                Nota: "Días No Disponibles" ya no es un ítem aparte
+                de este menú (se absorbió en una tarea anterior
+                dentro de la pestaña "Días Bloqueados" de Reglas de
+                Agendamiento), por lo que la sección colapsable
+                mantiene los seis ítems que existen hoy, no siete.
             -->
 
-            <div class="text-white-50 text-uppercase small fw-semibold px-2 mt-3 mb-1">
-                ⚙️ Configuración
+            <a href="#menuConfiguracion"
+               class="menu-item {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}active{% endif %}"
+               data-bs-toggle="collapse"
+               role="button"
+               aria-expanded="{% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}true{% else %}false{% endif %}"
+               aria-controls="menuConfiguracion">
+
+                <span>⚙️ Configuración</span> <i class="bi bi-chevron-down"></i>
+
+            </a>
+
+            <div class="collapse {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}show{% endif %}"
+                 id="menuConfiguracion">
+
+                <div class="d-flex flex-column" style="gap:4px;">
+
+                    <!-- Usuarios -->
+
+                    <a href="{% url 'lista_usuarios' %}" class="menu-item {% if '/usuarios/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-people"></i>
+
+                        <span>Usuarios</span>
+
+                    </a>
+
+
+                    <!-- Competencias -->
+
+                    <a href="{% url 'lista_competencias' %}" class="menu-item {% if '/competencias/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-diagram-3"></i>
+
+                        <span>Competencias</span>
+
+                    </a>
+
+
+                    <!-- Tipos de Audiencia -->
+
+                    <a href="{% url 'lista_tipos_audiencia' %}" class="menu-item {% if '/tipos-audiencia/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-list-check"></i>
+
+                        <span>Tipos de Audiencia</span>
+
+                    </a>
+
+
+                    <!-- Salas -->
+
+                    <a href="{% url 'lista_salas' %}" class="menu-item {% if '/salas/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-door-closed"></i>
+
+                        <span>Salas</span>
+
+                    </a>
+
+
+                    <!-- Bloques Horarios -->
+
+                    <a href="{% url 'lista_bloques' %}" class="menu-item {% if '/bloques/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-clock-history"></i>
+
+                        <span>Bloques Horarios</span>
+
+                    </a>
+
+
+                    <!-- Reglas de Agendamiento -->
+                    <!-- Enlaza a la pestaña "General" del módulo unificado
+                         "Reglas de Agendamiento" (General / Plazos Legales /
+                         Asignación de días por competencia / Días Bloqueados,
+                         ver templates/reglas_agendamiento/_tabs.html). -->
+
+                    <a href="{% url 'configuracion_general' %}" class="menu-item {% if '/reglas-agendamiento/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-clipboard-check"></i>
+
+                        <span>Reglas de Agendamiento</span>
+
+                    </a>
+
+                </div>
+
             </div>
-
-
-            <!-- Usuarios -->
-
-            <a href="{% url 'lista_usuarios' %}" class="menu-item">
-
-                <i class="bi bi-people"></i>
-
-                <span>Usuarios</span>
-
-            </a>
-
-
-            <!-- Competencias -->
-
-            <a href="{% url 'lista_competencias' %}" class="menu-item">
-
-                <i class="bi bi-diagram-3"></i>
-
-                <span>Competencias</span>
-
-            </a>
-
-
-            <!-- Tipos de Audiencia -->
-
-            <a href="{% url 'lista_tipos_audiencia' %}" class="menu-item">
-
-                <i class="bi bi-list-check"></i>
-
-                <span>Tipos de Audiencia</span>
-
-            </a>
-
-
-            <!-- Salas -->
-
-            <a href="{% url 'lista_salas' %}" class="menu-item">
-
-                <i class="bi bi-door-closed"></i>
-
-                <span>Salas</span>
-
-            </a>
-
-
-            <!-- Bloques Horarios -->
-
-            <a href="{% url 'lista_bloques' %}" class="menu-item">
-
-                <i class="bi bi-clock-history"></i>
-
-                <span>Bloques Horarios</span>
-
-            </a>
-
-
-            <!-- Reglas de Agendamiento -->
-            <!-- Enlaza a la pestaña "General" del módulo unificado
-                 "Reglas de Agendamiento" (General / Plazos Legales /
-                 Asignación de días por competencia / Días Bloqueados,
-                 ver templates/reglas_agendamiento/_tabs.html). La
-                 administración de días no disponibles (antes un ítem
-                 aparte de este menú, "Días No Disponibles") quedó
-                 absorbida dentro de la pestaña "Días Bloqueados" de
-                 este mismo módulo, sin un enlace de menú propio. -->
-
-            <a href="{% url 'configuracion_general' %}" class="menu-item">
-
-                <i class="bi bi-clipboard-check"></i>
-
-                <span>Reglas de Agendamiento</span>
-
-            </a>
 
         </nav>
 
 
         <!-- ================================================= -->
-        <!--             USUARIO DEL SISTEMA                   -->
+        <!--             SECCIÓN INFERIOR DEL SIDEBAR          -->
         <!-- ================================================= -->
+        <!--
+            Agrupa "usuario conectado" + "cerrar sesión" en un único
+            bloque (.sidebar-footer, ver static/css/style.css) para
+            que <aside class="sidebar"> tenga exactamente TRES hijos
+            directos (encabezado / nav / esta sección): así
+            justify-content:space-between del sidebar reparte el
+            espacio sobrante de forma predecible entre esos tres
+            bloques, sin insertar además un hueco suelto entre
+            "usuario" y "cerrar sesión" -que deben permanecer juntos,
+            como pide el diagrama del pedido de compactación-.
+        -->
 
-        <div class="sidebar-user">
+        <div class="sidebar-footer">
 
-            <div class="user-avatar">
+            <!-- Usuario del sistema -->
 
-                <i class="bi bi-person-circle"></i>
+            <div class="sidebar-user">
+
+                <div class="user-avatar">
+
+                    <i class="bi bi-person-circle"></i>
+
+                </div>
+
+                <div class="user-info">
+
+                    <strong>Funcionario</strong>
+
+                    <small>Tribunal</small>
+
+                </div>
 
             </div>
 
-            <div class="user-info">
 
-                <strong>Funcionario</strong>
+            <!-- Cerrar sesión -->
+            <!--
+                LogoutView (Django 5) solo acepta solicitudes POST.
+                Se reemplaza el enlace GET por un formulario POST con
+                csrf_token. El botón conserva la clase "menu-item" para
+                heredar exactamente el mismo estilo del resto del menú;
+                los estilos en línea solo neutralizan la apariencia por
+                defecto del navegador para <button> (fondo, borde,
+                alineación y fuente), sin tocar ningún archivo CSS.
+            -->
+            <form method="post" action="{% url 'logout' %}" style="margin:0;">
 
-                <small>Tribunal</small>
+                {% csrf_token %}
 
-            </div>
+                <button type="submit" class="menu-item"
+                        style="width:100%; background:none; border:none; text-align:left; font:inherit; cursor:pointer;">
+
+                    <i class="bi bi-box-arrow-right"></i>
+
+                    <span>Cerrar sesión</span>
+
+                </button>
+
+            </form>
 
         </div>
-
-
-        <!-- ================================================= -->
-        <!--             CERRAR SESIÓN                         -->
-        <!-- ================================================= -->
-
-        <!--
-            LogoutView (Django 5) solo acepta solicitudes POST.
-            Se reemplaza el enlace GET por un formulario POST con
-            csrf_token. El botón conserva la clase "menu-item" para
-            heredar exactamente el mismo estilo del resto del menú;
-            los estilos en línea solo neutralizan la apariencia por
-            defecto del navegador para <button> (fondo, borde,
-            alineación y fuente), sin tocar ningún archivo CSS.
-        -->
-        <form method="post" action="{% url 'logout' %}" style="margin:0;">
-
-            {% csrf_token %}
-
-            <button type="submit" class="menu-item"
-                    style="width:100%; background:none; border:none; text-align:left; font:inherit; cursor:pointer;">
-
-                <i class="bi bi-box-arrow-right"></i>
-
-                <span>Cerrar sesión</span>
-
-            </button>
-
-        </form>
 
     </aside>
 
@@ -351,6 +433,49 @@
 
 <!-- Bootstrap -->
 <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+
+<!-- ========================================================= -->
+<!--   PRESERVAR POSICIÓN DE SCROLL ENTRE ENVÍOS DE FORMULARIO  -->
+<!-- ========================================================= -->
+<!--
+    En todo el sistema, las acciones que modifican datos (guardar,
+    activar/desactivar, buscar causa, ver disponibilidad, etc.) se
+    hacen enviando un <form> normal -recarga completa de la
+    página, sin AJAX, mismo criterio en todo el proyecto-, no con
+    peticiones AJAX. El navegador, por defecto, siempre vuelve al
+    principio de la página en cada recarga, aunque el funcionario
+    estuviera trabajando más abajo (por ejemplo, en una tabla
+    larga, o al activar/desactivar un registro que no es el
+    primero de la lista).
+
+    Se agrega UNA SOLA VEZ acá, en la plantilla base que heredan
+    todas las pantallas del sistema (Salas, Bloques, Usuarios,
+    Reglas de Agendamiento, Audiencias, etc.), para que aplique en
+    cualquier <form> de cualquier pantalla sin tener que repetir
+    este script en cada una. "submit" es un evento que hace
+    bubbling hasta document, así que este único listener capta el
+    envío de cualquier formulario de la página, sin necesidad de
+    engancharse a cada uno por separado.
+
+    sessionStorage (no localStorage): el valor solo debe vivir
+    hasta la próxima carga de página dentro de la misma pestaña;
+    no debe persistir más allá de eso ni compartirse entre
+    pestañas. Se borra apenas se usa, para no afectar una entrada
+    nueva a cualquier pantalla (por ejemplo, entrando desde el
+    menú lateral con un simple enlace, que no pasa por este
+    listener porque no es un envío de formulario).
+-->
+<script>
+    document.addEventListener("submit", function () {
+        sessionStorage.setItem("scrollGuardado", window.scrollY);
+    });
+
+    var scrollGuardadoAlCargar = sessionStorage.getItem("scrollGuardado");
+    if (scrollGuardadoAlCargar !== null) {
+        window.scrollTo(0, parseInt(scrollGuardadoAlCargar, 10));
+        sessionStorage.removeItem("scrollGuardado");
+    }
+</script>
 
 </body>
 

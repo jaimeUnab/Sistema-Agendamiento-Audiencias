@@ -445,17 +445,29 @@ def ver_disponibilidad_audiencia(request):
     Muestra, para la sala y fecha ya seleccionadas, qué bloques
     horarios configurados (BloqueHorario) están ocupados por
     otra Audiencia PROGRAMADA -con su RIT, carátula y tipo de
-    audiencia reales- y cuáles están disponibles.
+    audiencia reales-, cuáles están disponibles, y cuáles caen
+    dentro del rango que el funcionario está a punto de elegir
+    (bloqueInicio + cantidadBloques), mostrados como
+    "Seleccionado" con el RIT/carátula/tipo de audiencia que se
+    está armando.
+
+    "Seleccionado" es puramente una previsualización en
+    memoria: no crea ni guarda ninguna Audiencia ni ningún otro
+    registro (ver más abajo). Un bloque ya "Ocupado" por una
+    Audiencia real conserva siempre esa prioridad -es
+    información real, no una posibilidad-, aunque también caiga
+    dentro del rango recién elegido.
 
     Es una consulta de presentación, de solo lectura: no valida
     plazos legales, no calcula disponibilidad "propuesta", no
     crea ni modifica nada, y no repite ninguna regla de
     ValidadorAgendamiento ni de GeneradorPropuestaFecha (no
     decide qué bloques podrían proponerse automáticamente; solo
-    lista lo que ya existe en la base de datos). El funcionario
-    sigue eligiendo manualmente "bloqueInicio" en el propio
-    AudienciaForm; esta vista únicamente le muestra información
-    para decidir con criterio.
+    lista lo que ya existe en la base de datos, más lo que el
+    propio funcionario ya escribió en este mismo envío). El
+    funcionario sigue eligiendo manualmente "bloqueInicio" en el
+    propio AudienciaForm; esta vista únicamente le muestra
+    información para decidir con criterio.
 
     Requiere que "sala" y "fecha" ya estén completados en el
     formulario (no requiere causa ni el resto de los campos,
@@ -519,13 +531,80 @@ def ver_disponibilidad_audiencia(request):
         for orden in range(inicio, fin + 1):
             ordenes_ocupados[orden] = audiencia
 
-    disponibilidad = [
-        {
+    # -------------------------------------------------
+    # Previsualización de los bloques que el funcionario está a
+    # punto de elegir (bloqueInicio + cantidadBloques), tal como
+    # vienen en ESTE MISMO envío. Es solo de presentación: no se
+    # guarda nada -ninguna Audiencia ni ningún otro registro-;
+    # únicamente se calcula, en memoria, qué "orden" de bloque
+    # caería dentro de ese rango, con el mismo criterio
+    # (bloqueInicio.orden + cantidadBloques - 1) que ya usa
+    # services.py al guardar de verdad. Si falta causa
+    # encontrada, tipo de audiencia, bloque de inicio o cantidad
+    # de bloques, simplemente no hay nada que previsualizar
+    # todavía: la tabla se comporta exactamente igual que antes
+    # (solo Ocupado/Disponible).
+    # -------------------------------------------------
+
+    # "Ver disponibilidad" tiene formnovalidate: es normal que el
+    # funcionario lo presione antes de haber elegido tipoAudiencia/
+    # bloqueInicio/cantidadBloques todavía. En ese caso llegan como
+    # cadena vacía "" (no ausentes), y un id vacío no es un id
+    # válido para consultar por pk -.filter(pk="") lanza ValueError
+    # en un campo numérico, a diferencia de pk=None, que
+    # simplemente no encuentra nada-. Por eso se comprueba primero
+    # que el valor no esté vacío antes de consultar.
+
+    tipoAudiencia_id = request.POST.get("tipoAudiencia")
+    tipo_audiencia_seleccionado = (
+        TipoAudiencia.objects.filter(pk=tipoAudiencia_id).first()
+        if tipoAudiencia_id else None
+    )
+
+    bloqueInicio_id = request.POST.get("bloqueInicio")
+    bloque_inicio_seleccionado = (
+        BloqueHorario.objects.filter(pk=bloqueInicio_id).first()
+        if bloqueInicio_id else None
+    )
+
+    try:
+        cantidad_bloques_seleccionada = int(request.POST.get("cantidadBloques"))
+    except (TypeError, ValueError):
+        cantidad_bloques_seleccionada = None
+
+    ordenes_seleccionados = set()
+
+    if (
+        causa_encontrada
+        and tipo_audiencia_seleccionado
+        and bloque_inicio_seleccionado
+        and cantidad_bloques_seleccionada
+        and cantidad_bloques_seleccionada > 0
+    ):
+        inicio_seleccion = bloque_inicio_seleccionado.orden
+        fin_seleccion = inicio_seleccion + cantidad_bloques_seleccionada - 1
+        ordenes_seleccionados = set(range(inicio_seleccion, fin_seleccion + 1))
+
+    disponibilidad = []
+
+    for bloque in BloqueHorario.objects.all().order_by("orden"):
+        audiencia_ocupante = ordenes_ocupados.get(bloque.orden)
+
+        disponibilidad.append({
             "bloque": bloque,
-            "audiencia": ordenes_ocupados.get(bloque.orden),
-        }
-        for bloque in BloqueHorario.objects.all().order_by("orden")
-    ]
+            "audiencia": audiencia_ocupante,
+            # Un bloque ya "Ocupado" por una Audiencia real
+            # conserva siempre esa prioridad sobre la
+            # previsualización: es información real, no una
+            # posibilidad. Si además cae dentro del rango recién
+            # elegido, ese conflicto ya lo reporta
+            # ValidadorAgendamiento como advertencia aparte; esta
+            # tabla no lo disfraza de "Seleccionado".
+            "seleccionado": (
+                audiencia_ocupante is None
+                and bloque.orden in ordenes_seleccionados
+            ),
+        })
 
     return render(
         request,
@@ -535,6 +614,7 @@ def ver_disponibilidad_audiencia(request):
             "causa_encontrada": causa_encontrada,
             "disponibilidad": disponibilidad,
             "sala_disponibilidad": sala,
+            "tipo_audiencia_seleccionado": tipo_audiencia_seleccionado,
         }
     )
 

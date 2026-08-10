@@ -50,21 +50,6 @@ Reglas de Agendamiento
                 <span class="text-success fw-bold">●</span> <span class="text-muted small">Habilitado</span>
                 <span class="text-secondary fw-bold">○</span> <span class="text-muted small">No habilitado</span>
 
-                <!-- type="reset" + form="...": el atributo "form" asocia este
-                     botón al <form> de la matriz aunque esté fuera de él en
-                     el HTML (estándar HTML5). Al presionarlo, el navegador
-                     restablece los checkboxes ocultos a su valor "checked"
-                     original -es decir, al último estado GUARDADO en la
-                     base de datos, que es como se renderizó la página-; el
-                     evento "reset" (ver <script> más abajo) sincroniza la
-                     apariencia visual de cada celda con ese valor
-                     restablecido. No existe un concepto de "configuración
-                     por defecto" distinto del último estado guardado: no
-                     se inventa ninguna regla de negocio nueva aquí. -->
-                <button type="reset" form="form-matriz-dias" class="btn btn-outline-secondary btn-sm">
-                    Restablecer por defecto
-                </button>
-
             </div>
 
         </div>
@@ -168,10 +153,9 @@ Reglas de Agendamiento
 <!--              JAVASCRIPT                    -->
 <!-- ========================================= -->
 <!-- Único script de esta página: alterna la apariencia y el checkbox
-     oculto de una celda al hacer clic, y mantiene ambos sincronizados
-     cuando se presiona "Restablecer por defecto". Sin dependencias
-     nuevas, sin petición adicional -el guardado real solo ocurre al
-     enviar el <form> completo con "Guardar cambios". -->
+     oculto de una celda al hacer clic. Sin dependencias nuevas, sin
+     petición adicional -el guardado real solo ocurre al enviar el
+     <form> completo con "Guardar cambios". -->
 
 <script>
     function actualizarVisualCelda(checkbox, boton) {
@@ -193,16 +177,6 @@ Reglas de Agendamiento
         checkbox.checked = !checkbox.checked;
         actualizarVisualCelda(checkbox, boton);
     }
-
-    document.getElementById("form-matriz-dias").addEventListener("reset", function () {
-        // El evento "reset" se dispara justo cuando el navegador ya
-        // restableció los checkboxes a su valor "checked" original;
-        // se recorren para sincronizar la apariencia de cada botón
-        // con ese valor.
-        document.querySelectorAll(".celda-dia").forEach(function (checkbox) {
-            actualizarVisualCelda(checkbox, checkbox.nextElementSibling);
-        });
-    });
 </script>
 
 {% endblock %}

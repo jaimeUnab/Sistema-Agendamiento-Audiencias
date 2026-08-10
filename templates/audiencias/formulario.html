@@ -19,8 +19,11 @@ Nueva Audiencia
 
 {% block content %}
 
-<!-- Subtítulo/instrucción, tal como en el mockup. -->
-<p class="text-muted mb-4">
+<!-- Subtítulo/instrucción, tal como en el mockup. mb-2 (antes mb-4):
+     menos espacio vacío entre esta instrucción y los campos, para
+     que funcione como encabezado pegado a la sección, no como un
+     párrafo suelto. -->
+<p class="text-muted mb-2">
     Seleccione los datos para buscar una fecha disponible.
 </p>
 
@@ -40,23 +43,30 @@ Nueva Audiencia
     <!-- ========================================= -->
     <!--   FILA 1: COMPETENCIA / TIPO / SALA        -->
     <!-- ========================================= -->
-    <!-- Tres selects en una misma fila, como en el mockup. -->
+    <!-- Tres selects en una misma fila, como en el mockup.
+         "campo-formulario" (ver static/css/style.css) hace que el
+         label quede siempre arriba del select, y que el select ocupe
+         todo el ancho de su columna -de otra forma, sin la piel de
+         Bootstrap para campos (que este proyecto no usa), cada select
+         toma un ancho distinto según su propio texto más largo, y las
+         tres columnas quedan visualmente desalineadas aunque el grid
+         les dé el mismo espacio-. -->
 
     <div class="row g-3 mb-3">
 
-        <div class="col-md-4">
+        <div class="col-md-4 campo-formulario">
             {{ form.competencia.label_tag }}
             {{ form.competencia }}
             {{ form.competencia.errors }}
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4 campo-formulario">
             {{ form.tipoAudiencia.label_tag }}
             {{ form.tipoAudiencia }}
             {{ form.tipoAudiencia.errors }}
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4 campo-formulario">
             {{ form.sala.label_tag }}
             {{ form.sala }}
             {{ form.sala.errors }}
@@ -80,7 +90,14 @@ Nueva Audiencia
 
             <div class="row g-3 align-items-end">
 
-                <div class="col-md-5">
+                <!-- "campo-formulario" (ver static/css/style.css): mismo
+                     criterio que la fila de Competencia/Tipo/Sala -label
+                     arriba, campo a todo el ancho disponible-. El botón
+                     "Buscar causa" queda justo al lado (mismo
+                     "d-flex gap-2" de siempre): no se le aplica esta
+                     clase, así que conserva su tamaño normal, sin
+                     volverse gigante. -->
+                <div class="col-md-5 campo-formulario">
                     {{ form.rit.label_tag }}
                     <div class="d-flex gap-2">
                         {{ form.rit }}
@@ -139,6 +156,15 @@ Nueva Audiencia
     <!-- ========================================= -->
     <!--   FECHA  +  DISPONIBILIDAD DE AGENDA       -->
     <!-- ========================================= -->
+    <!-- Las dos tarjetas de esta fila ya NO usan "h-100": esa clase
+         las obligaba a estirarse a la misma altura que la tarjeta
+         más alta (la de "Disponibilidad de agenda", con la tabla,
+         "Configuración de la audiencia" y las propuestas), dejando
+         un espacio vacío grande al final de la tarjeta corta
+         ("Selección manual de fecha"). Sin "h-100", cada tarjeta usa
+         solo el alto que necesita su propio contenido -mejor
+         aprovechamiento del espacio, sin afectar ningún dato ni
+         comportamiento-. -->
 
     <div class="row g-3">
 
@@ -148,7 +174,7 @@ Nueva Audiencia
 
         <div class="col-md-4">
 
-            <div class="card shadow-sm h-100">
+            <div class="card shadow-sm">
 
                 <div class="card-body">
 
@@ -161,8 +187,14 @@ Nueva Audiencia
                     {{ form.fecha.errors }}
 
                     <!-- formnovalidate: solo necesita sala+fecha, el
-                         resto del formulario puede seguir incompleto. -->
+                         resto del formulario puede seguir incompleto.
+                         id="btn-ver-disponibilidad": permite que el script
+                         de más abajo "presione" este mismo botón por
+                         código (boton.click()) cuando cambian tipo de
+                         audiencia/bloque de inicio/cantidad de bloques,
+                         sin duplicar su formaction/formnovalidate. -->
                     <button type="submit"
+                            id="btn-ver-disponibilidad"
                             formaction="{% url 'ver_disponibilidad_audiencia' %}"
                             formnovalidate
                             class="btn btn-outline-primary mt-3 w-100">
@@ -182,7 +214,7 @@ Nueva Audiencia
 
         <div class="col-md-8">
 
-            <div class="card shadow-sm h-100">
+            <div class="card shadow-sm">
 
                 <div class="card-body">
 
@@ -196,11 +228,55 @@ Nueva Audiencia
                     <!-- Consulta de solo lectura (ver_disponibilidad_audiencia):
                          no decide qué bloques proponer ni valida nada, solo
                          muestra qué audiencias ya ocupan cada bloque de la
-                         sala y fecha seleccionadas. El funcionario sigue
-                         eligiendo manualmente "Bloque de inicio" más abajo. -->
+                         sala y fecha seleccionadas, y -mientras el funcionario
+                         todavía no confirma nada- una previsualización en
+                         memoria ("Seleccionado") de los bloques que caerían
+                         dentro de bloqueInicio + cantidadBloques recién
+                         elegidos, con el RIT/carátula/tipo de audiencia que se
+                         está armando. Nada de esto se guarda: solo se guarda
+                         al presionar "Guardar audiencia"/"Confirmar
+                         programación" (ver registrar_audiencia en views.py).
+
+                         Esta tabla solo se recalcula cuando se ENVÍA este
+                         formulario hacia ver_disponibilidad_audiencia (no hay
+                         actualización en vivo sin ida al servidor).
+
+                         Filas "Disponible" o "Seleccionado" son clickeables
+                         (cursor:pointer + onclick): al hacer clic abren el
+                         modal "¿Cuántos bloques?" con la hora de esa fila.
+                         Las filas "Ocupado" no lo son -no tiene sentido
+                         elegir un bloque que ya tiene una audiencia real-.
+                         "Bloque de inicio" ya NO se elige desde una lista
+                         desplegable visible: se completa por código
+                         (abrirModalCantidadBloques/confirmarCantidadBloques
+                         en el <script> de más abajo) al aceptar ese modal,
+                         que a su vez dispara el mismo reenvío automático a
+                         ver_disponibilidad_audiencia que ya usan "Usar esta
+                         propuesta" y los demás cambios (ver
+                         actualizarDisponibilidad()).
+
+                         "disponibilidad-scroll" (ver static/css/style.css)
+                         le da a este contenedor una altura máxima y scroll
+                         vertical propio, para que la tabla completa de
+                         bloques (08:00 a 23:30) no haga crecer toda la
+                         página: solo esta sección se desplaza. Es
+                         puramente visual -no cambia qué bloques se
+                         consultan, ni la lógica de clic/selección de cada
+                         fila, que sigue funcionando igual dentro del
+                         contenedor con scroll-.
+
+                         Cada fila lleva siempre data-bloque/data-hora/
+                         data-hora-termino (estén o no "Ocupadas"), aunque
+                         solo las filas "Disponible"/"Seleccionado" tengan
+                         onclick: el resumen de "Configuración de la
+                         audiencia" (ver más abajo) necesita poder recorrer
+                         TODOS los bloques en orden -incluidos los
+                         ocupados- para calcular correctamente la hora de
+                         término de un rango de varios bloques, sin volver
+                         a consultar el servidor. -->
                     {% if disponibilidad %}
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-hover align-middle mb-0">
+                    <div class="table-responsive disponibilidad-scroll mb-3">
+                        <table id="tabla-disponibilidad" class="table table-sm table-hover align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Hora</th>
@@ -212,13 +288,27 @@ Nueva Audiencia
                             </thead>
                             <tbody>
                                 {% for item in disponibilidad %}
-                                <tr>
+                                <tr
+                                    data-bloque="{{ item.bloque.pk }}"
+                                    data-hora="{{ item.bloque.horaInicio|time:'H:i' }}"
+                                    data-hora-termino="{{ item.bloque.horaTermino|time:'H:i' }}"
+                                    {% if not item.audiencia %}
+                                    style="cursor:pointer;"
+                                    onclick="abrirModalCantidadBloques(this)"
+                                    title="Elegir este bloque como hora de inicio"
+                                    {% endif %}
+                                >
                                     <td>{{ item.bloque.horaInicio|time:"H:i" }}</td>
                                     {% if item.audiencia %}
                                         <td>{{ item.audiencia.causa.rit }}</td>
                                         <td>{{ item.audiencia.causa.caratulado }}</td>
                                         <td>{{ item.audiencia.tipoAudiencia.nombre }}</td>
                                         <td><span class="badge bg-danger">Ocupado</span></td>
+                                    {% elif item.seleccionado %}
+                                        <td>{{ causa_encontrada.rit }}</td>
+                                        <td>{{ causa_encontrada.caratulado }}</td>
+                                        <td>{{ tipo_audiencia_seleccionado.nombre }}</td>
+                                        <td><span class="badge bg-primary">Seleccionado</span></td>
                                     {% else %}
                                         <td>—</td>
                                         <td>—</td>
@@ -240,33 +330,57 @@ Nueva Audiencia
                     <!-- ============================= -->
                     <!--  CONFIGURACIÓN DE LA AUDIENCIA -->
                     <!-- ============================= -->
-                    <!-- bloqueInicio + cantidadBloques: la misma decisión de
-                         diseño de siempre. horaInicio/horaTermino NO se
-                         calculan ni se muestran aquí -las calcula
-                         ServicioCreacionAudiencia a partir de estos dos
-                         valores, recién al guardar-, así que no hay ningún
-                         detalle técnico adicional que mostrar: el
-                         funcionario entiende el horario resultante mirando
-                         la tabla de disponibilidad de arriba. -->
+                    <!-- bloqueInicio: sigue siendo el mismo campo real del
+                         formulario (se sigue enviando y validando en el
+                         servidor exactamente igual que antes), pero ya no
+                         se muestra como <select> visible: ahora se completa
+                         por código al hacer clic en una fila "Disponible"/
+                         "Seleccionado" de la tabla de arriba y aceptar el
+                         modal "¿Cuántos bloques?" (ver
+                         confirmarCantidadBloques() en el <script>).
+
+                         "resumen-vacio"/"resumen-seleccion" son solo texto
+                         informativo (no son campos del formulario): uno de
+                         los dos se muestra según haya o no una selección
+                         vigente (actualizarResumenSeleccion() alterna entre
+                         ambos con la clase "d-none"). "Bloques
+                         seleccionados"/"Hora de inicio"/"Hora de término"
+                         son puramente informativos -no editables- y se
+                         calculan a partir de datos que ya están en el HTML
+                         de la tabla de arriba (data-hora/data-hora-termino
+                         de cada fila), sin volver a consultar el servidor.
+                         "Solicitar propuestas" pertenece funcionalmente a
+                         esta tarjeta y permanece dentro de ella. -->
 
                     <div class="border rounded p-3 bg-light">
 
                         <h6 class="fw-bold mb-3">Configuración de la audiencia</h6>
 
-                        <div class="row g-3">
+                        <div class="d-none">
+                            {{ form.bloqueInicio }}
+                        </div>
+                        {{ form.bloqueInicio.errors }}
 
-                            <div class="col-sm-8">
-                                {{ form.bloqueInicio.label_tag }}
-                                {{ form.bloqueInicio }}
-                                {{ form.bloqueInicio.errors }}
-                            </div>
+                        <div id="resumen-vacio" class="text-muted small mb-3">
+                            {% if sala_disponibilidad %}
+                                Selecciona una fila "Disponible" en la tabla de arriba
+                                para elegir el bloque de inicio.
+                            {% else %}
+                                Primero presiona "Ver disponibilidad" para poder elegir
+                                un bloque desde la tabla.
+                            {% endif %}
+                        </div>
 
-                            <div class="col-sm-4">
-                                {{ form.cantidadBloques.label_tag }}
-                                {{ form.cantidadBloques }}
-                                {{ form.cantidadBloques.errors }}
-                            </div>
-
+                        <div id="resumen-seleccion" class="d-none mb-3">
+                            <p class="mb-1">
+                                Bloques seleccionados: <strong id="resumen-cantidad"></strong>
+                            </p>
+                            <p class="mb-1">
+                                Hora de inicio: <strong id="resumen-hora-inicio"></strong>
+                            </p>
+                            <p class="mb-0">
+                                Hora de término: <strong id="resumen-hora-termino"></strong>
+                            </p>
                         </div>
 
                         <!-- formnovalidate: fecha/bloqueInicio pueden seguir
@@ -275,7 +389,7 @@ Nueva Audiencia
                         <button type="submit"
                                 formaction="{% url 'proponer_fechas_audiencia' %}"
                                 formnovalidate
-                                class="btn btn-outline-primary mt-3">
+                                class="btn btn-outline-primary">
                             Solicitar propuestas
                         </button>
 
@@ -329,6 +443,73 @@ Nueva Audiencia
 
         </div>
 
+    </div>
+
+
+    <!-- ============================= -->
+    <!--  MODAL: ¿CUÁNTOS BLOQUES?      -->
+    <!-- ============================= -->
+    <!-- Bootstrap Modal, ya cargado por el proyecto vía
+         bootstrap.bundle.min.js: no se agrega ninguna librería nueva.
+         Se abre al hacer clic en una fila de la tabla
+         (abrirModalCantidadBloques). Contiene el campo cantidadBloques
+         REAL del formulario -no una copia-: lo que el funcionario
+         elija acá es literalmente cleaned_data de ese campo, sin
+         riesgo de que un select duplicado quede desincronizado del
+         que realmente se envía. Debe seguir estando DENTRO del form
+         principal para que su valor viaje con el resto del
+         formulario.
+
+         IMPORTANTE: se ubica aquí, como hijo directo de <form> y
+         FUERA de cualquier .card, a propósito. Iba antes dentro de la
+         card de "Disponibilidad de agenda", y eso rompía el modal: el
+         CSS del proyecto tiene ".card:hover{transform:translateY(-3px);...}",
+         y un elemento ancestro con "transform" crea un nuevo
+         "containing block" para los hijos con position:fixed -que es
+         justamente cómo Bootstrap posiciona el modal-, así que el
+         modal quedaba anclado a esa card en vez de a la ventana: al
+         mover el mouse (entrando/saliendo del hover de la card) el
+         modal saltaba de lugar y parpadeaba, sin poder hacerle clic.
+         Sacándolo de cualquier .card se evita el problema de raíz.
+
+         NOTA: en este comentario se evita a propósito escribir la
+         sintaxis real de la variable de Django entre llaves dobles:
+         el motor de templates la interpreta igual aunque esté dentro
+         de un comentario HTML, duplicando el <select> en el código
+         fuente (invisible para el usuario, pero innecesario). -->
+
+    <div class="modal fade" id="modalCantidadBloques" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">¿Cuántos bloques ocupará la audiencia?</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <p class="mb-3">
+                        Hora de inicio elegida: <strong id="modal-hora-elegida">—</strong>
+                    </p>
+
+                    {{ form.cantidadBloques.label_tag }}
+                    {{ form.cantidadBloques }}
+                    {{ form.cantidadBloques.errors }}
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="confirmarCantidadBloques()">
+                        Aceptar
+                    </button>
+                </div>
+
+            </div>
+        </div>
     </div>
 
 
@@ -392,8 +573,17 @@ Nueva Audiencia
     <!-- ========================================= -->
     <!--   VOLVER  /  GUARDAR AUDIENCIA              -->
     <!-- ========================================= -->
+    <!-- Misma lógica y estilo de siempre -"Volver" izquierda/acción
+         secundaria (btn-link), "Guardar audiencia" derecha/acción
+         principal (btn-primary), sin centrar, mismo texto "Guardar
+         audiencia" (todavía no "Confirmar programación": ese cambio
+         de texto queda para cuando se implemente la selección
+         directa de bloques)-. border-top + pt-3 (en vez de solo
+         mt-4) para que la fila quede visualmente anclada como pie de
+         la pantalla, en lugar de sentirse separada del contenido por
+         un espacio vacío. -->
 
-    <div class="d-flex justify-content-between align-items-center mt-4">
+    <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-3">
 
         <a href="{% url 'inicio' %}" class="btn btn-link ps-0">
             &larr; Volver
@@ -410,15 +600,168 @@ Nueva Audiencia
 <!-- ========================================= -->
 <!--              JAVASCRIPT                    -->
 <!-- ========================================= -->
-<!-- Único script de esta página: completa fecha/bloqueInicio del
-     formulario principal a partir de los data-* de la propuesta
-     elegida. Sin dependencias nuevas, sin petición adicional. -->
+<!-- Completa fecha/bloqueInicio del formulario principal a partir de
+     los data-* de la propuesta elegida o de la fila de la tabla
+     clickeada (vía el modal "¿Cuántos bloques?"), muestra un resumen
+     en texto de lo elegido, y refresca automáticamente la tabla de
+     "Disponibilidad de agenda" (previsualización "Seleccionado")
+     cuando cambia alguno de esos datos. Sin dependencias nuevas, sin
+     petición AJAX: simplemente reenvía el mismo <form> con la misma
+     acción que ya usa el botón "Ver disponibilidad" (su propio
+     atributo formaction), presionándolo por código en vez de esperar
+     que el funcionario lo vuelva a presionar a mano. -->
 
 <script>
+    // Recuerda qué bloque (pk de BloqueHorario) se clickeó en la
+    // tabla mientras el modal está abierto, hasta que se presione
+    // "Aceptar" (ahí recién se copia a id_bloqueInicio).
+    var bloqueClickeado = null;
+
+    function abrirModalCantidadBloques(fila) {
+        bloqueClickeado = fila.dataset.bloque;
+        document.getElementById("modal-hora-elegida").textContent = fila.dataset.hora;
+
+        var modal = new bootstrap.Modal(document.getElementById("modalCantidadBloques"));
+        modal.show();
+    }
+
+    function confirmarCantidadBloques() {
+        if (!bloqueClickeado) {
+            return;
+        }
+
+        document.getElementById("id_bloqueInicio").value = bloqueClickeado;
+
+        var instanciaModal = bootstrap.Modal.getInstance(document.getElementById("modalCantidadBloques"));
+        if (instanciaModal) {
+            instanciaModal.hide();
+        }
+
+        actualizarResumenSeleccion();
+        actualizarDisponibilidad();
+    }
+
     function usarPropuesta(boton) {
         document.getElementById("id_fecha").value = boton.dataset.fecha;
         document.getElementById("id_bloqueInicio").value = boton.dataset.bloque;
+        actualizarResumenSeleccion();
+        actualizarDisponibilidad();
     }
+
+    function obtenerTodosLosBloques() {
+        // Recorre TODAS las filas de la tabla de disponibilidad (en
+        // el mismo orden en que las armó la vista, por "orden" de
+        // BloqueHorario -incluye las "Ocupadas", ver el comentario
+        // HTML de la tabla-) y arma una lista simple {pk, horaInicio,
+        // horaTermino} a partir de sus atributos data-*, sin volver a
+        // consultar el servidor: sirve para calcular la hora de
+        // término de un rango de varios bloques a partir de dónde
+        // empieza y cuántos bloques abarca.
+        var filas = document.querySelectorAll("#tabla-disponibilidad tbody tr[data-bloque]");
+        var bloques = [];
+
+        filas.forEach(function (fila) {
+            bloques.push({
+                pk: fila.dataset.bloque,
+                horaInicio: fila.dataset.hora,
+                horaTermino: fila.dataset.horaTermino,
+            });
+        });
+
+        return bloques;
+    }
+
+    function actualizarResumenSeleccion() {
+        // Lee la opción actualmente elegida del propio <select>
+        // bloqueInicio -oculto, pero sigue siendo el campo real-;
+        // funciona igual venga la elección del modal o de "Usar esta
+        // propuesta".
+        var selectBloque = document.getElementById("id_bloqueInicio");
+        var opcionElegida = selectBloque.options[selectBloque.selectedIndex];
+        var cantidad = parseInt(document.getElementById("id_cantidadBloques").value, 10);
+
+        var resumenVacio = document.getElementById("resumen-vacio");
+        var resumenSeleccion = document.getElementById("resumen-seleccion");
+
+        if (!opcionElegida || !opcionElegida.value) {
+            // Todavía no hay ningún bloque elegido: se muestra el
+            // mensaje informativo en vez del resumen.
+            resumenVacio.classList.remove("d-none");
+            resumenSeleccion.classList.add("d-none");
+            return;
+        }
+
+        var bloques = obtenerTodosLosBloques();
+        var indiceInicio = -1;
+        for (var i = 0; i < bloques.length; i++) {
+            if (bloques[i].pk === opcionElegida.value) {
+                indiceInicio = i;
+                break;
+            }
+        }
+
+        var horaInicio = indiceInicio !== -1 ? bloques[indiceInicio].horaInicio : "—";
+
+        // La hora de término es la del bloque "cantidadBloques - 1"
+        // posiciones después del bloque de inicio, dentro de esa
+        // misma lista ordenada -mismo criterio que ya usa
+        // services.py (bloqueInicio.orden + cantidadBloques - 1)-,
+        // pero calculado acá solo para mostrarlo, sin repetir ninguna
+        // validación de negocio. Si el rango se saliera de los
+        // bloques ya cargados en la tabla (caso extremo), se muestra
+        // "—" en vez de fallar.
+        var horaTermino = "—";
+        if (indiceInicio !== -1 && !isNaN(cantidad) && cantidad > 0) {
+            var indiceFin = indiceInicio + cantidad - 1;
+            if (bloques[indiceFin]) {
+                horaTermino = bloques[indiceFin].horaTermino;
+            }
+        }
+
+        document.getElementById("resumen-cantidad").textContent = isNaN(cantidad) ? "—" : cantidad;
+        document.getElementById("resumen-hora-inicio").textContent = horaInicio;
+        document.getElementById("resumen-hora-termino").textContent = horaTermino;
+
+        resumenVacio.classList.add("d-none");
+        resumenSeleccion.classList.remove("d-none");
+    }
+
+    function actualizarDisponibilidad() {
+        // ver_disponibilidad_audiencia exige sala y fecha completos
+        // (ver views.py); si todavía faltan, no hay nada que
+        // refrescar -se evita reenviar el formulario solo para volver
+        // a mostrar el mismo mensaje de "selecciona sala y fecha"-.
+        var sala = document.getElementById("id_sala").value;
+        var fecha = document.getElementById("id_fecha").value;
+
+        if (!sala || !fecha) {
+            return;
+        }
+
+        // La posición de scroll se guarda y se restaura de forma
+        // genérica para TODA la aplicación (ver base_dashboard.html:
+        // un único listener de "submit" cubre cualquier formulario de
+        // cualquier pantalla), así que no hace falta repetir esa
+        // lógica acá: este botón es, para ese listener, un envío de
+        // formulario más.
+        document.getElementById("btn-ver-disponibilidad").click();
+    }
+
+    document.getElementById("id_tipoAudiencia").addEventListener("change", actualizarDisponibilidad);
+
+    // id_bloqueInicio ya no es visible ni se cambia directamente por
+    // el usuario (solo por código, vía el modal o "Usar esta
+    // propuesta", que ya llaman a actualizarDisponibilidad() por su
+    // cuenta): no necesita su propio listener de "change" -tampoco
+    // se dispararía solo, ya que asignar .value por JavaScript no
+    // emite un evento "change" nativo-.
+
+    // id_cantidadBloques ahora vive dentro del modal: NO se le agrega
+    // un listener de "change" a propósito, para que elegir la
+    // cantidad mientras el modal sigue abierto no dispare un envío
+    // del formulario (recargaría la página y cerraría el modal antes
+    // de presionar "Aceptar"). Su valor se usa recién al confirmar.
+    actualizarResumenSeleccion();
 </script>
 
 {% endblock %}

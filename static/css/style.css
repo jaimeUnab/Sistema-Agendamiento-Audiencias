@@ -178,56 +178,50 @@ a{
 }
 
 /* =====================================================
-   SIDEBAR
-===================================================== */
-
-/* Contenedor principal del menú lateral */
-.sidebar{
-
-    width:280px;
-    min-height:100vh;
-
-    background:#0f376b;
-
-    color:white;
-
-    padding:30px;
-
-}
-
-/* Centra el título del sistema en el menú */
-.sidebar-header{
-
-    text-align:center;
-
-    margin-bottom:40px;
-
-}
-
-/* Estilo del título del sistema */
-.sidebar-header h3{
-
-    font-weight:700;
-
-    line-height:1.4;
-
-    font-size:24px;
-
-}/* =====================================================
-   SIDEBAR
+   SIDEBAR (RESPONSIVE VERTICAL, con clamp())
 ===================================================== */
 
 /*
     Contenedor principal del menú lateral.
 
-    Se utiliza un degradado para entregar una apariencia
-    moderna y similar al diseño del sistema.
+    NOTA HISTÓRICA: antes existían DOS bloques ".sidebar" y DOS
+    bloques "MENÚ LATERAL" duplicados en este archivo (con
+    valores contradictorios entre sí). Se consolidaron en una
+    sola definición por selector en una tarea anterior; esta
+    tarea reemplaza los valores fijos en px de esa consolidación
+    por clamp(MÍNIMO, PREFERIDO, MÁXIMO), donde el término
+    PREFERIDO usa unidades "vh" (porcentaje del alto de la
+    ventana). Así, cada medida se recalcula automáticamente según
+    el alto real de la pantalla, sin depender de una resolución
+    fija ni de un breakpoint específico:
+
+    - En pantallas altas, el término "vh" crece hasta tocar el
+      MÁXIMO de cada clamp() -> espaciado cómodo, sin volverse
+      exageradamente grande.
+    - En pantallas bajas, el término "vh" decrece hasta tocar el
+      MÍNIMO de cada clamp() -> espaciado compacto, sin volverse
+      ilegible ni desaparecer.
+    - Entre esos dos extremos, la transición es continua (no a
+      saltos), porque clamp() se recalcula en cada resize, sin
+      necesidad de listar manualmente cada resolución posible.
+
+    height:100vh (fijo, no min-height): el sidebar ocupa
+    exactamente el alto de la ventana. display:flex +
+    flex-direction:column mantienen el orden vertical de
+    siempre (logo -> navegación -> sección inferior); es
+    ".menu" (flex:1) y ".sidebar-footer" (margin-top:auto) -más
+    abajo- quienes reparten el espacio sobrante entre la
+    navegación y la sección inferior, en vez de
+    justify-content:space-between (ambas técnicas logran un
+    footer siempre pegado abajo; se usa flex:1 + margin-top:auto
+    por ser el patrón estándar para esto y porque fue el que se
+    pidió explícitamente).
 */
 .sidebar{
 
     width:290px;
 
-    min-height:100vh;
+    height:100vh;
 
     background:linear-gradient(180deg,#0b2f59 0%,#144b91 100%);
 
@@ -237,41 +231,54 @@ a{
 
     flex-direction:column;
 
-    justify-content:space-between;
-
-    padding:35px 22px;
+    padding:clamp(10px,3vh,28px) 16px;
 
 }
 
 
 /*
-    Encabezado del menú.
-
-    Contiene el logo y el nombre del sistema.
+    Encabezado del menú: logo y nombre del sistema. No crece ni
+    se encoge (sin flex-grow/shrink propios): su tamaño lo da
+    únicamente el contenido, ya escalado con clamp() más abajo.
 */
 .sidebar-header{
 
     text-align:center;
 
+    flex:0 0 auto;
+
 }
 
 
 /*
-    Logo del sistema.
+    Logo del sistema: contenedor circular que recorta la imagen
+    de la balanza (static/img/icono programa.png).
 
-    Se representa mediante un icono de Bootstrap.
+    clamp(96px, 18vh, 156px): x3 respecto al tamaño anterior
+    (32/6vh/52px) -pedido explícito-; nunca baja de 96px ni sube
+    de 156px (el "18vh" es el término que reacciona al alto de
+    la ventana).
+
+    Ya NO dibuja su propio fondo/borde (antes
+    background:rgba(255,255,255,.12) + border:2px solid
+    rgba(255,255,255,.20)): la imagen provista ya trae su propio
+    círculo azul, anillo blanco y resplandor; mantener además el
+    fondo/borde de este contenedor dibujaría un anillo doble. Lo
+    único que hace ".logo" ahora es fijar el tamaño, mantenerlo
+    circular (border-radius:50%) y recortar lo que sobre de la
+    imagen (overflow:hidden).
 */
 .logo{
 
-    width:90px;
+    width:clamp(96px,18vh,156px);
 
-    height:90px;
+    height:clamp(96px,18vh,156px);
 
-    margin:auto;
-
-    margin-bottom:20px;
+    margin:0 auto clamp(4px,1vh,10px);
 
     border-radius:50%;
+
+    overflow:hidden;
 
     display:flex;
 
@@ -279,44 +286,59 @@ a{
 
     align-items:center;
 
-    background:rgba(255,255,255,.12);
-
-    border:2px solid rgba(255,255,255,.20);
-
 }
 
 
 /*
-    Icono del logo.
+    Imagen del logo (balanza de la justicia).
+
+    object-fit:cover recorta la imagen (1536x1024px, no
+    cuadrada) a cuadrado por el centro, sin deformarla; el
+    círculo de ".logo" (border-radius:50% + overflow:hidden)
+    recorta ese cuadrado a círculo. width/height:100% hacen que
+    ocupe todo el contenedor -que a su vez ya escala con
+    clamp() según el alto de pantalla, ver ".logo" arriba-, así
+    que la imagen se agranda/achica junto con el resto del
+    logo, sin necesitar su propio clamp().
 */
-.logo i{
+.logo img{
 
-    font-size:48px;
+    width:100%;
 
-    color:white;
+    height:100%;
+
+    object-fit:cover;
+
+    display:block;
 
 }
 
 
 /*
     Nombre del sistema.
+
+    Es texto puramente decorativo/identificador, no un enlace de
+    navegación (a diferencia de ".menu-item span" más abajo, que
+    SÍ es texto de navegación y se mantiene fijo en 16px sin
+    clamp): por eso aquí sí se permite que se achique un poco más
+    en pantallas bajas (mínimo 10px, todavía legible) para ganar
+    espacio.
 */
 .sidebar-header h3{
 
-    font-size:18px;
+    font-size:clamp(10px,1.6vh,14px);
 
     font-weight:700;
 
-    line-height:1.6;
+    line-height:1.3;
 
-    letter-spacing:.8px;
+    letter-spacing:.6px;
 
     text-transform:uppercase;
 
-    margin-bottom:40px;
+    margin:0 0 clamp(2px,0.8vh,10px);
 
 }
-
 
 
 /* =====================================================
@@ -325,6 +347,31 @@ a{
 
 /*
     Contenedor del menú.
+
+    flex:1 -> ocupa TODO el espacio vertical que sobra entre el
+    encabezado y la sección inferior (ver .sidebar-footer), que
+    es justamente lo que permite que el footer quede siempre
+    pegado abajo sin fijar ninguna altura a mano.
+
+    min-height:0 corrige un comportamiento por defecto de
+    flexbox (el "minimum content size" automático) que, sin esta
+    línea, podría impedir que ".menu" se encoja por debajo de su
+    contenido y terminaría empujando al footer fuera de la
+    pantalla en vez de dejarlo pegado abajo.
+
+    overflow-y:auto es una RED DE SEGURIDAD, no la solución
+    principal (la solución principal es que el contenido, ya
+    escalado con clamp(), quepa solo): si en un caso extremo no
+    entrara igual (por ejemplo, una ventana recortada a una
+    altura absurdamente pequeña con el zoom del navegador
+    también alterado), aparece scroll SOLO en esta franja de
+    navegación, nunca en el logo ni en la sección inferior, que
+    siempre quedan visibles. En el rango de alturas real de
+    escritorio (ver clamp() de abajo) no llega a activarse.
+
+    gap reducido con clamp(2px, 0.6vh, 8px): separación entre
+    Inicio/Agenda/Nueva Audiencia/Configuración, que se achica
+    en pantallas bajas y se ensancha en pantallas altas.
 */
 .menu{
 
@@ -332,16 +379,27 @@ a{
 
     flex-direction:column;
 
-    gap:8px;
+    flex:1;
+
+    min-height:0;
+
+    overflow-y:auto;
+
+    gap:clamp(2px,0.6vh,8px);
 
 }
 
 
 /*
-    Cada opción del menú.
+    Cada opción del menú (incluye también el encabezado
+    desplegable "Configuración" y el botón "Cerrar sesión": los
+    tres reutilizan esta misma clase, por lo que se escalan los
+    tres a la vez sin tocar cada uno por separado).
 
-    Se utiliza Flexbox para alinear correctamente
-    el icono y el texto.
+    Padding vertical con clamp(5px, 1.3vh, 12px): la altura de
+    cada opción se adapta al alto disponible. El padding
+    horizontal (12px) se mantiene fijo: no depende de la altura
+    de la pantalla.
 */
 .menu-item{
 
@@ -349,15 +407,17 @@ a{
 
     align-items:center;
 
-    gap:15px;
+    gap:12px;
 
     color:white;
 
-    padding:15px 18px;
+    text-decoration:none;
 
-    border-radius:14px;
+    padding:clamp(5px,1.3vh,12px) 12px;
 
-    transition:.30s;
+    border-radius:10px;
+
+    transition:.2s;
 
     font-weight:500;
 
@@ -366,12 +426,18 @@ a{
 
 /*
     Iconos del menú.
+
+    clamp(15px, 2.3vh, 20px): se achican/agrandan levemente
+    junto con la fila; el texto de cada opción (.menu-item span,
+    abajo) NO usa clamp: se mantiene fijo, porque el pedido es
+    ahorrar espacio con padding/margin/altura, no con tipografía
+    más pequeña.
 */
 .menu-item i{
 
-    font-size:22px;
+    font-size:clamp(15px,2.3vh,20px);
 
-    width:28px;
+    width:22px;
 
     text-align:center;
 
@@ -380,6 +446,12 @@ a{
 
 /*
     Texto del menú.
+
+    SIN clamp() a propósito: se mantiene fijo en 16px -mismo
+    tamaño original- en cualquier alto de pantalla. Es el
+    elemento que el pedido explícitamente no quiere ver reducido
+    "para no solucionar el problema simplemente achicando la
+    fuente".
 */
 .menu-item span{
 
@@ -389,7 +461,7 @@ a{
 
 
 /*
-    Animación al pasar el mouse.
+    Animación al pasar el mouse. Mismo efecto de siempre.
 */
 .menu-item:hover{
 
@@ -397,7 +469,7 @@ a{
 
     color:white;
 
-    transform:translateX(5px);
+    transform:translateX(4px);
 
 }
 
@@ -405,19 +477,49 @@ a{
 /*
     Opción actualmente seleccionada.
 
-    Utiliza un degradado diferente para destacar.
+    Mismo degradado azul de siempre para destacarla.
 */
 .menu-item.active{
 
     background:linear-gradient(90deg,#2563eb,#3b82f6);
 
-    box-shadow:0 8px 18px rgba(37,99,235,.35);
+    box-shadow:0 6px 14px rgba(37,99,235,.35);
 
 }
 
 
 /*
-    Usuario ubicado al final del menú.
+    Envuelve la sección inferior del sidebar (usuario conectado
+    + botón "Cerrar sesión") en un único bloque.
+
+    margin-top:auto es la técnica estándar de Flexbox para
+    "empujar" un elemento hasta el final de un contenedor
+    columna: consume todo el espacio sobrante que ".menu" (con
+    flex:1) no haya reclamado, dejando esta sección SIEMPRE
+    pegada a la parte inferior del sidebar, sin importar cuántas
+    opciones tenga el menú ni el alto de la pantalla.
+
+    flex:0 0 auto: nunca se encoge ni se agranda por su cuenta;
+    su tamaño lo da solo su contenido (ya escalado con clamp()
+    más abajo).
+*/
+.sidebar-footer{
+
+    display:flex;
+
+    flex-direction:column;
+
+    flex:0 0 auto;
+
+    gap:clamp(4px,1vh,10px);
+
+    margin-top:auto;
+
+}
+
+
+/*
+    Usuario conectado, dentro de la sección inferior.
 */
 .sidebar-user{
 
@@ -425,11 +527,9 @@ a{
 
     align-items:center;
 
-    gap:15px;
+    gap:clamp(6px,1.5vh,12px);
 
-    margin-top:40px;
-
-    padding-top:22px;
+    padding-top:clamp(6px,1.3vh,14px);
 
     border-top:1px solid rgba(255,255,255,.15);
 
@@ -441,7 +541,7 @@ a{
 */
 .user-avatar{
 
-    font-size:48px;
+    font-size:clamp(18px,3.4vh,28px);
 
     color:white;
 
@@ -465,7 +565,7 @@ a{
 */
 .user-info strong{
 
-    font-size:16px;
+    font-size:clamp(12px,1.8vh,15px);
 
     font-weight:600;
 
@@ -479,47 +579,81 @@ a{
 
     color:#d6d6d6;
 
-    font-size:13px;
+    font-size:clamp(10px,1.5vh,13px);
 
 }
 
 
-/* =====================================================
-   MENÚ LATERAL
-===================================================== */
+/*
+    Media query SOLO para alturas de ventana muy pequeñas
+    (menos de 480px de alto -por ejemplo, una ventana recortada
+    o el DevTools del navegador ocupando media pantalla-, un
+    caso ya extremo fuera del rango normal de un escritorio).
 
-/* Estilo base de cada opción del menú */
-.menu-item{
+    No es la responsable de que el menú "quepa": eso ya lo logran
+    los clamp() de arriba, cuyo propio mínimo evita que el diseño
+    se rompa incluso sin esta media query (se comprobó por
+    cálculo que el contenido total cabe hasta con ~440px de alto
+    solo con los mínimos de clamp()). Se agrega igual, como
+    margen de seguridad adicional explícitamente pedido ("media
+    queries únicamente cuando sean necesarias para alturas
+    pequeñas"), y para reforzar visualmente ese caso límite.
+    Nótese que ".menu-item span" (el texto de navegación) NO se
+    toca ni aquí: sigue en 16px siempre.
+*/
+@media (max-height:480px){
 
-    display:block;
+    .sidebar{
+        padding:8px 16px;
+    }
 
-    color:white;
+    .logo{
+        width:30px;
+        height:30px;
+        margin-bottom:3px;
+    }
 
-    text-decoration:none;
+    .logo i{
+        font-size:14px;
+    }
 
-    padding:15px 20px;
+    .sidebar-header h3{
+        font-size:9px;
+        margin-bottom:2px;
+    }
 
-    margin-bottom:10px;
+    .menu{
+        gap:2px;
+    }
 
-    border-radius:12px;
+    .menu-item{
+        padding:4px 12px;
+    }
 
-    transition:.2s;
+    .menu-item i{
+        font-size:13px;
+    }
 
-}
+    .sidebar-footer{
+        gap:3px;
+    }
 
-/* Cambia el color al pasar el mouse */
-.menu-item:hover{
+    .sidebar-user{
+        padding-top:5px;
+        gap:5px;
+    }
 
-    background:#1d5fe3;
+    .user-avatar{
+        font-size:15px;
+    }
 
-    color:white;
+    .user-info strong{
+        font-size:11px;
+    }
 
-}
-
-/* Resalta la opción del menú seleccionada */
-.menu-item.active{
-
-    background:#2d6df6;
+    .user-info small{
+        font-size:9px;
+    }
 
 }
 
@@ -1005,6 +1139,103 @@ a{
     margin-top:40px;
 
     margin-bottom:20px;
+
+}
+
+
+/* =====================================================
+   DISPONIBILIDAD DE AGENDA (scroll interno)
+===================================================== */
+
+/*
+    Contenedor de la tabla "Disponibilidad de agenda" (pantalla
+    Nueva Audiencia, templates/audiencias/formulario.html). Le da
+    una altura máxima y scroll vertical propio, para que la tabla
+    completa de bloques horarios (08:00 a 23:30) no haga crecer
+    toda la página: solo esta sección se desplaza, la página
+    general mantiene su alto.
+
+    clamp(300px, 58vh, 600px): el término preferido usa "vh" para
+    adaptarse al alto real de la ventana -mismo criterio que ya
+    usa el sidebar responsive (ver clamp() más arriba en este
+    archivo)-, en vez de fijar una cantidad de filas a mano. En
+    una pantalla de escritorio habitual (~768px de alto) deja
+    visibles aproximadamente los bloques de 08:00 a 14:00. El
+    mínimo (300px) evita que quede demasiado chico en pantallas
+    bajas; el máximo (600px) evita que crezca sin límite en
+    monitores muy altos.
+
+    Se agrega junto a ".table-responsive" (Bootstrap), no en su
+    reemplazo: esa clase ya resuelve el scroll horizontal si la
+    tabla no entra en el ancho disponible (overflow-x); acá solo
+    se agrega overflow-y para el alto.
+*/
+.disponibilidad-scroll{
+
+    max-height:clamp(300px,58vh,600px);
+
+    overflow-y:auto;
+
+}
+
+
+/*
+    Encabezado de la tabla de disponibilidad, fijo mientras se
+    hace scroll interno. Se aplica sobre cada <th> -no sobre
+    <thead>-: es la forma que funciona de manera consistente
+    entre navegadores para "pegar" un encabezado de tabla dentro
+    de un contenedor con su propio scroll. Necesita un fondo
+    sólido (si no, las filas se transparentarían "detrás" de los
+    títulos de columna al desplazarse) y z-index para quedar por
+    encima de las filas que pasan debajo.
+*/
+.disponibilidad-scroll thead th{
+
+    position:sticky;
+
+    top:0;
+
+    background-color:#fff;
+
+    z-index:1;
+
+}
+
+
+/* =====================================================
+   NUEVA AUDIENCIA: FILA COMPETENCIA / TIPO / SALA + RIT
+===================================================== */
+
+/*
+    Pantalla "Nueva Audiencia" (templates/audiencias/formulario.html).
+    El proyecto no usa "form-select"/"form-control" en ningún
+    formulario (convención ya establecida: los <select>/<input> se
+    renderizan tal cual los genera Django, sin la piel de Bootstrap
+    para campos). Sin esa piel, un <select> sin ancho explícito toma
+    el ancho de su opción más larga -no el ancho de la columna que lo
+    contiene-, así que tres selects con textos de distinta longitud
+    (Competencia/Tipo de audiencia/Sala) quedan con anchos desiguales
+    aunque el grid les dé exactamente el mismo espacio, y el label
+    puede quedar en la misma línea que el campo en vez de arriba.
+
+    ".campo-formulario" corrige ambas cosas por descendencia -sin
+    agregarle una clase al propio widget que genera Django, ni tocar
+    forms.py-: el label queda siempre arriba del campo, y el
+    select/input ocupa todo el ancho disponible de su columna. No
+    cambia colores, bordes ni tipografía: solo el tamaño/posición.
+*/
+.campo-formulario label{
+
+    display:block;
+
+    margin-bottom:.35rem;
+
+}
+
+.campo-formulario select,
+.campo-formulario input[type="text"]{
+
+    width:100%;
 
 }
 

@@ -30,7 +30,7 @@ from bloques.models import BloqueHorario
 from causas.models import Causa
 from competencias.models import Competencia
 from salas.models import Sala
-from tipos_audiencia.models import TipoAudiencia, TipoPlazo
+from tipos_audiencia.models import TipoAudiencia
 
 from .models import Audiencia, EstadoAudiencia
 
@@ -59,13 +59,13 @@ class AudienciaModelTests(TestCase):
             nombre="Competencia de Pruebas"
         )
 
+        # TipoAudiencia ya no está asociado a una competencia ni
+        # tiene campos de plazo (eso ahora vive en
+        # ReglaAgendamiento, app reglas_agendamiento); aquí se
+        # usan únicamente sus campos actuales.
         self.tipo_audiencia = TipoAudiencia.objects.create(
-            competencia=self.competencia,
             nombre="Tipo de Prueba",
-            plazoMinimoDias=5,
-            plazoMaximoDias=30,
-            horizonteBusquedaDias=60,
-            tipoPlazo=TipoPlazo.HABIL,
+            activo=True,
         )
 
         self.sala = Sala.objects.create(nombre="Sala de Pruebas Audiencias")
