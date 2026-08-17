@@ -28,6 +28,14 @@ from django.contrib.auth.decorators import login_required
 # cambiar_agendamiento_automatico en otras apps del proyecto.
 from django.views.decorators.http import require_POST
 
+# Agrupa el guardado de la audiencia y el registro de su
+# trazabilidad en una única operación atómica (ver
+# guardar_anotacion_audiencia): si registrarModificacion() fallara,
+# el cambio sobre la audiencia también se revierte. Mismo criterio
+# que ya usan ServicioCreacionAudiencia/ServicioBajaAudiencia en
+# audiencias/services.py.
+from django.db import transaction
+
 # Framework de mensajes para notificar el resultado de una acción.
 from django.contrib import messages
 
@@ -72,13 +80,14 @@ from .forms import AudienciaForm, DejarSinEfectoAudienciaForm, MotivoBaja
 # qué bloques de una sala/fecha ya están ocupados.
 from .models import Audiencia, EstadoAudiencia
 
-# Servicios de negocio: coordinan la creación, la baja lógica, y
-# generan propuestas automáticas de fecha. Toda regla de negocio
-# vive aquí, no en esta vista.
+# Servicios de negocio: coordinan la creación, la baja lógica, la
+# trazabilidad, y generan propuestas automáticas de fecha. Toda
+# regla de negocio vive aquí, no en esta vista.
 from .services import (
     GeneradorPropuestaFecha,
     ServicioBajaAudiencia,
     ServicioCreacionAudiencia,
+    ServicioTrazabilidad,
 )
 
 
@@ -797,6 +806,20 @@ def guardar_anotacion_audiencia(request):
     ServicioCreacionAudiencia -la anotación no es un dato que
     esas reglas validen ni que afecte el agendamiento-.
 
+    A diferencia de cambiar_estado_sala/
+    cambiar_agendamiento_automatico, este cambio SÍ queda
+    registrado en RegistroTrazabilidad: se sigue exactamente el
+    flujo de MODIFICACION ya documentado en el docstring de
+    ServicioTrazabilidad (audiencias/services.py) -fotografiar
+    ANTES de modificar, guardar, y recién ahí
+    registrarModificacion() con esa fotografía previa-, envuelto
+    en transaction.atomic() para que, si registrarModificacion()
+    fallara, el cambio sobre "anotacion" también se revierta y no
+    quede una audiencia modificada sin su trazabilidad
+    correspondiente. El usuario responsable es siempre
+    request.user (el mismo criterio de autoría que usa
+    ServicioCreacionAudiencia/ServicioBajaAudiencia).
+
     Tras guardar, redirige a la agenda diaria de la fecha de esa
     audiencia (?fecha=...), para que el funcionario vea de
     inmediato que el cambio se aplicó sobre la audiencia
@@ -815,8 +838,19 @@ def guardar_anotacion_audiencia(request):
         Audiencia, pk=request.POST.get("audiencia_id")
     )
 
-    audiencia.anotacion = (request.POST.get("anotacion") or "").strip()
-    audiencia.save(update_fields=["anotacion"])
+    nueva_anotacion = (request.POST.get("anotacion") or "").strip()
+
+    # Fotografía ANTES de modificar, tal como exige el contrato
+    # documentado en ServicioTrazabilidad: una vez guardado el
+    # nuevo valor, el valor anterior ya no existe en la instancia.
+    anterior = ServicioTrazabilidad.fotografiar(audiencia)
+
+    with transaction.atomic():
+        audiencia.anotacion = nueva_anotacion
+        audiencia.save(update_fields=["anotacion"])
+        ServicioTrazabilidad.registrarModificacion(
+            audiencia, request.user, valoresAnteriores=anterior
+        )
 
     if audiencia.anotacion:
         messages.success(request, "Anotación guardada correctamente.")

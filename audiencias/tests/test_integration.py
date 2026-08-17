@@ -19,6 +19,8 @@ conjunto.
 
 import datetime
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -658,3 +660,155 @@ class DejarSinEfectoAudienciaIntegrationTests(TestCase):
         # ...pero la otra audiencia PROGRAMADA del mismo día sigue
         # apareciendo con normalidad.
         self.assertIn(self.otra_audiencia, audiencias_mostradas)
+
+
+# =====================================================
+# TRAZABILIDAD DE LA ANOTACIÓN (AUDIENCIA YA REGISTRADA)
+# =====================================================
+
+class GuardarAnotacionAudienciaTrazabilidadIntegrationTests(TestCase):
+    """
+    Prueba de integración de guardar_anotacion_audiencia: verifica
+    que modificar la anotación de una audiencia YA REGISTRADA quede
+    reflejada en RegistroTrazabilidad (acción MODIFICACION), con el
+    mismo mecanismo de fotografía que ya usan registrarCreacion() y
+    registrarBaja() (ver audiencias/services.py:ServicioTrazabilidad).
+    No cubre la anotación de una audiencia todavía "Seleccionada"
+    (sin guardar): esa no pasa por esta vista, ver
+    FlujoCompletoRegistroAudienciaIntegrationTests más arriba.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="usuario_anotacion_integracion",
+            email="anotacion_integracion@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Anotación Integración",
+        )
+        self.competencia = Competencia.objects.create(
+            nombre="Competencia Anotación Integración"
+        )
+        self.tipo_audiencia = TipoAudiencia.objects.create(
+            nombre="Tipo Anotación Integración", activo=True
+        )
+        self.sala = Sala.objects.create(
+            nombre="Sala Anotación Integración", activa=True
+        )
+        self.causa = Causa.objects.create(
+            competencia=self.competencia,
+            rit="7003-2027",
+            ruc="2700070030-3",
+            caratulado="Causa Anotación Integración",
+        )
+        self.bloque = BloqueHorario.objects.create(
+            orden=9721,
+            horaInicio=datetime.time(9, 0),
+            horaTermino=datetime.time(9, 30),
+        )
+        self.fecha = datetime.date(2027, 5, 15)
+
+        self.audiencia = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=self.bloque,
+            cantidadBloques=1,
+            fecha=self.fecha,
+            horaInicio=self.bloque.horaInicio,
+            horaTermino=self.bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+            anotacion="Anotación original.",
+        )
+
+        self.client.login(username=self.usuario.email, password="ClaveSegura123")
+
+    def test_modificar_anotacion_genera_un_registro_de_trazabilidad(self):
+        self.client.post(
+            reverse("guardar_anotacion_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "anotacion": "Se requiere presencia de perito.",
+            },
+        )
+
+        self.assertEqual(
+            RegistroTrazabilidad.objects.filter(audiencia=self.audiencia).count(),
+            1,
+        )
+
+    def test_el_registro_corresponde_a_la_accion_de_modificacion(self):
+        self.client.post(
+            reverse("guardar_anotacion_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "anotacion": "Se requiere presencia de perito.",
+            },
+        )
+
+        registro = RegistroTrazabilidad.objects.get(audiencia=self.audiencia)
+        self.assertEqual(registro.accion, AccionTrazabilidad.MODIFICACION)
+
+    def test_se_identifica_al_usuario_que_realizo_la_modificacion(self):
+        self.client.post(
+            reverse("guardar_anotacion_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "anotacion": "Se requiere presencia de perito.",
+            },
+        )
+
+        registro = RegistroTrazabilidad.objects.get(audiencia=self.audiencia)
+        self.assertEqual(registro.usuario, self.usuario)
+
+    def test_fotografia_refleja_la_anotacion_anterior_y_la_nueva(self):
+        self.client.post(
+            reverse("guardar_anotacion_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "anotacion": "Se requiere presencia de perito.",
+            },
+        )
+
+        registro = RegistroTrazabilidad.objects.get(audiencia=self.audiencia)
+        self.assertEqual(
+            registro.valoresAnteriores["anotacion"], "Anotación original."
+        )
+        self.assertEqual(
+            registro.valoresNuevos["anotacion"], "Se requiere presencia de perito."
+        )
+
+        # La audiencia en base de datos también quedó con el valor
+        # nuevo (la fotografía no es lo único que se verifica: debe
+        # coincidir con el dato real).
+        self.audiencia.refresh_from_db()
+        self.assertEqual(
+            self.audiencia.anotacion, "Se requiere presencia de perito."
+        )
+
+    def test_si_la_modificacion_falla_no_queda_un_cambio_parcial(self):
+        # Simula una falla al registrar la trazabilidad (por ejemplo,
+        # un problema de base de datos): registrarModificacion() se
+        # reemplaza para que lance una excepción. Como el guardado de
+        # "anotacion" y el registro de trazabilidad viajan dentro del
+        # mismo transaction.atomic() (ver guardar_anotacion_audiencia
+        # en audiencias/views.py), la excepción debe revertir también
+        # el cambio sobre la audiencia: no debe quedar ni el nuevo
+        # valor guardado ni ningún RegistroTrazabilidad creado.
+        with patch(
+            "audiencias.views.ServicioTrazabilidad.registrarModificacion",
+            side_effect=RuntimeError("Falla simulada al registrar trazabilidad."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("guardar_anotacion_audiencia"),
+                    {
+                        "audiencia_id": self.audiencia.pk,
+                        "anotacion": "Este cambio no debe quedar guardado.",
+                    },
+                )
+
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.anotacion, "Anotación original.")
+        self.assertFalse(
+            RegistroTrazabilidad.objects.filter(audiencia=self.audiencia).exists()
+        )
