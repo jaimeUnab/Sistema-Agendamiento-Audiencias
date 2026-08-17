@@ -1,16 +1,16 @@
 """
-Módulo de pruebas de la aplicación Audiencias.
+Pruebas de MODELO de la aplicación Audiencias.
 
-Contiene pruebas básicas del modelo Audiencia. Todavía no
-existen vistas ni formularios para este módulo, por lo que
-estas pruebas verifican únicamente el modelo (creación
-directa vía el ORM), no un flujo HTTP.
+Contiene pruebas básicas del modelo Audiencia: creación directa vía
+el ORM, sin pasar por AudienciaForm ni por ninguna vista HTTP. No
+son pruebas de integración (no usan el cliente de pruebas) ni
+prueban lógica de negocio (eso vive en test_services_unit.py): solo
+verifican que el modelo almacena correctamente lo que se le pasa.
 
-Cada clase de prueba usa django.test.TestCase, que envuelve
-cada método de prueba en su propia transacción y la revierte
-al finalizar: no es necesario limpiar manualmente los datos
-creados en cada prueba, y ninguna prueba depende del estado
-que haya dejado otra.
+Movidas aquí desde el antiguo audiencias/tests.py (un único
+archivo, reorganizado en el paquete audiencias/tests/ para separar
+pruebas de modelo, unitarias de servicios/formularios, y de
+integración).
 """
 
 # =====================================================
@@ -32,7 +32,7 @@ from competencias.models import Competencia
 from salas.models import Sala
 from tipos_audiencia.models import TipoAudiencia
 
-from .models import Audiencia, EstadoAudiencia
+from audiencias.models import Audiencia, EstadoAudiencia
 
 Usuario = get_user_model()
 
@@ -59,10 +59,6 @@ class AudienciaModelTests(TestCase):
             nombre="Competencia de Pruebas"
         )
 
-        # TipoAudiencia ya no está asociado a una competencia ni
-        # tiene campos de plazo (eso ahora vive en
-        # ReglaAgendamiento, app reglas_agendamiento); aquí se
-        # usan únicamente sus campos actuales.
         self.tipo_audiencia = TipoAudiencia.objects.create(
             nombre="Tipo de Prueba",
             activo=True,

@@ -27,4 +27,18 @@ urlpatterns = [
     # Agenda diaria: audiencias PROGRAMADAS de una fecha, de solo lectura.
     path("agenda/", views.agenda_diaria, name="agenda_diaria"),
 
+    # Agregar/modificar la anotación de una audiencia ya registrada.
+    path(
+        "anotacion/guardar/",
+        views.guardar_anotacion_audiencia,
+        name="guardar_anotacion_audiencia",
+    ),
+
+    # Dejar sin efecto (baja lógica) una audiencia PROGRAMADA.
+    path(
+        "dejar-sin-efecto/",
+        views.dejar_sin_efecto_audiencia,
+        name="dejar_sin_efecto_audiencia",
+    ),
+
 ]

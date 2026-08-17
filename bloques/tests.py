@@ -34,6 +34,13 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+# Bloques Horarios es un módulo de Configuración: sus vistas
+# ahora exigen rol Administrador (ver usuarios/decorators.py:
+# solo_administrador). El usuario de prueba de este archivo se
+# crea con ese rol para seguir probando el comportamiento real
+# de cambiar_agendamiento_automatico, no el de un rol sin acceso.
+from usuarios.models import RolUsuario
+
 from .models import BloqueHorario
 
 Usuario = get_user_model()
@@ -56,6 +63,7 @@ class CambiarAgendamientoAutomaticoTests(TestCase):
             email="pruebas_bloques@tribunal.cl",
             password="ClaveSegura123",
             nombre="Usuario de Pruebas",
+            rol=RolUsuario.ADMINISTRADOR,
         )
 
         # Bloque de prueba con un "orden" fuera del rango que

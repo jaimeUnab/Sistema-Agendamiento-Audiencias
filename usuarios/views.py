@@ -33,6 +33,11 @@ from django.shortcuts import render
 # Formulario de alta de usuarios.
 from .forms import UsuarioForm
 
+# Decorador de control de acceso por rol (vistas de función):
+# mismo criterio que UserPassesTestMixin ya aplica más abajo en
+# UsuarioCreateView/UsuarioUpdateView, ver usuarios/decorators.py.
+from .decorators import solo_administrador
+
 # Modelo de usuario personalizado del sistema.
 from .models import RolUsuario, Usuario
 
@@ -72,13 +77,17 @@ class UsuarioLogoutView(LogoutView):
 # =====================================================
 
 @login_required
+@solo_administrador
 def lista_usuarios(request):
     """
     Muestra el listado de usuarios registrados
     en el sistema.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista -mismo
+    criterio que UsuarioCreateView/UsuarioUpdateView, que ya
+    exigían rol Administrador; esta vista no lo exigía todavía,
+    ver usuarios/decorators.py-.
     """
 
     # -------------------------------------------------

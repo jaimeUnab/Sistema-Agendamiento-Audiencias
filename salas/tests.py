@@ -28,6 +28,13 @@ from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
+# Salas es un módulo de Configuración: sus vistas ahora exigen
+# rol Administrador (ver usuarios/decorators.py:
+# solo_administrador). Los usuarios de prueba de este archivo se
+# crean con ese rol para seguir probando el comportamiento real
+# de crear_sala/cambiar_estado_sala, no el de un rol sin acceso.
+from usuarios.models import RolUsuario
+
 from .models import Sala
 
 Usuario = get_user_model()
@@ -54,6 +61,7 @@ class CrearSalaTests(TestCase):
             email="pruebas_crear@tribunal.cl",
             password="ClaveSegura123",
             nombre="Usuario de Pruebas",
+            rol=RolUsuario.ADMINISTRADOR,
         )
         self.client.force_login(self.usuario)
 
@@ -98,6 +106,7 @@ class NombreDuplicadoSalaTests(TestCase):
             email="pruebas_dup@tribunal.cl",
             password="ClaveSegura123",
             nombre="Usuario de Pruebas",
+            rol=RolUsuario.ADMINISTRADOR,
         )
         self.client.force_login(self.usuario)
 
@@ -153,6 +162,7 @@ class CambiarEstadoSalaTests(TestCase):
             email="pruebas_estado@tribunal.cl",
             password="ClaveSegura123",
             nombre="Usuario de Pruebas",
+            rol=RolUsuario.ADMINISTRADOR,
         )
 
         # Sala de prueba, activa por defecto.

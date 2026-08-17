@@ -175,6 +175,23 @@ class Audiencia(models.Model):
     )
 
     # -------------------------------------------------
+    # ANOTACIÓN
+    # -------------------------------------------------
+
+    # Anotación libre asociada a la audiencia completa (no a un
+    # bloque individual): por ejemplo, "Se requiere presencia de
+    # perito". Opcional (blank=True, default=""; no null=True:
+    # se usa cadena vacía como "sin anotación", mismo criterio
+    # que motivoBaja más arriba). Se gestiona desde la interfaz
+    # mediante un botón/modal, no como un campo visible
+    # permanente (ver templates/audiencias/formulario.html).
+    anotacion = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Anotación"
+    )
+
+    # -------------------------------------------------
     # AUDITORÍA DE CREACIÓN
     # -------------------------------------------------
 

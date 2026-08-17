@@ -216,12 +216,46 @@ a{
     footer siempre pegado abajo; se usa flex:1 + margin-top:auto
     por ser el patrón estándar para esto y porque fue el que se
     pidió explícitamente).
+
+    position:fixed + top:0 + left:0: mantiene el sidebar
+    completamente fijo en pantalla mientras el contenido principal
+    se desplaza. Antes se probó "position:sticky", pero no producía
+    ningún cambio visible: "html, body{overflow-x:hidden;}" (ver
+    más arriba en este archivo) tiene el efecto secundario -parte
+    de la propia especificación de CSS, no un error de tipeo- de
+    forzar a que "overflow-y" de body compute como "auto" en vez de
+    "visible" en cuanto se fija cualquiera de los dos ejes. Pero
+    body no tiene una altura fija (crece exactamente hasta la
+    altura de su contenido), así que nunca llega a desbordarse
+    dentro de su propia caja; el scroll que se ve en pantalla ocurre
+    en realidad un nivel más arriba (en el viewport/html), una caja
+    distinta de aquella contra la que "sticky" estaba anclando al
+    sidebar -mismo tipo de desajuste "containing block" que ya está
+    documentado más abajo para el modal, con "transform"-.
+    "position:fixed" no depende de esta ambigüedad: ancla siempre
+    contra el viewport directamente. Al sacar al sidebar del flujo
+    del documento, dejó de ocupar espacio dentro de ".d-flex"; por
+    eso ".content" (ver su propia regla más abajo) ahora agrega un
+    margin-left igual a este mismo ancho (290px), para que el
+    contenido empiece justo después del sidebar en vez de quedar
+    tapado debajo. z-index:1000 lo mantiene por encima del
+    contenido de cualquier página, pero por debajo de los modales
+    de Bootstrap (z-index 1050-1055), que deben seguir viéndose
+    sobre él sin problema.
 */
 .sidebar{
 
     width:290px;
 
     height:100vh;
+
+    position:fixed;
+
+    top:0;
+
+    left:0;
+
+    z-index:1000;
 
     background:linear-gradient(180deg,#0b2f59 0%,#144b91 100%);
 
@@ -667,12 +701,26 @@ a{
 
     Se aplica un color muy claro para generar contraste
     con el menú lateral.
+
+    margin-left:290px (mismo ancho que ".sidebar"): desde que el
+    sidebar pasó a "position:fixed" ya no ocupa espacio dentro del
+    flujo de ".d-flex" (ver el comentario de ".sidebar" más arriba),
+    así que sin este margen el contenido empezaría en el borde
+    izquierdo de la ventana, tapado detrás del sidebar. Con este
+    margen, el contenido empieza exactamente después del ancho real
+    del sidebar, igual que se veía antes de este cambio -la clase
+    Bootstrap "flex-grow-1" que trae este mismo elemento en el HTML
+    ya no tiene ningún efecto por este motivo (el sidebar dejó de
+    competir por espacio dentro de ".d-flex"), pero no hace falta
+    quitarla: no molesta ni cambia nada visualmente-.
 */
 .content{
 
     background:#f4f7fc;
 
     min-height:100vh;
+
+    margin-left:290px;
 
 }
 

@@ -91,13 +91,28 @@ class ReglaAgendamiento(models.Model):
 
     # Plazo mínimo para agendar, en la unidad indicada por
     # unidadPlazo.
+    #
+    # null=True, blank=True: es opcional. Existen reglas que
+    # solo definen un piso ("al menos N días de anticipación",
+    # sin tope superior) o solo un techo ("dentro de los N días
+    # siguientes", sin piso mínimo). Ver plazoMaximo más abajo y
+    # audiencias/services.py:_dentroDePlazo(), que interpreta
+    # las cuatro combinaciones posibles (solo mínimo, solo
+    # máximo, ambos, ninguno).
     plazoMinimo = models.PositiveIntegerField(
+        null=True,
+        blank=True,
         verbose_name="Plazo mínimo"
     )
 
     # Plazo máximo para agendar, en la unidad indicada por
     # unidadPlazo.
+    #
+    # null=True, blank=True: mismo criterio que plazoMinimo,
+    # ver su comentario.
     plazoMaximo = models.PositiveIntegerField(
+        null=True,
+        blank=True,
         verbose_name="Plazo máximo"
     )
 
@@ -133,14 +148,27 @@ class ReglaAgendamiento(models.Model):
 
     def __str__(self):
         """
-        Devuelve "Competencia - TipoAudiencia (min-max unidad)",
-        por ejemplo: "Familia - Preparatoria (5-30 Hábil)".
+        Devuelve "Competencia - TipoAudiencia (descripción del
+        plazo)", por ejemplo: "Familia - Preparatoria (5-30
+        Hábil)". Como plazoMinimo/plazoMaximo ahora son
+        opcionales de forma independiente, la descripción se
+        arma según cuál de los dos esté configurado (nunca
+        muestra "None"), con el mismo criterio que
+        audiencias/services.py:_dentroDePlazo() usa para
+        interpretar la regla.
         """
-        return (
-            f"{self.competencia} - {self.tipoAudiencia} "
-            f"({self.plazoMinimo}-{self.plazoMaximo} "
-            f"{self.get_unidadPlazo_display()})"
-        )
+        unidad = self.get_unidadPlazo_display()
+
+        if self.plazoMinimo is not None and self.plazoMaximo is not None:
+            descripcion_plazo = f"{self.plazoMinimo}-{self.plazoMaximo} {unidad}"
+        elif self.plazoMinimo is not None:
+            descripcion_plazo = f"mínimo {self.plazoMinimo} {unidad}"
+        elif self.plazoMaximo is not None:
+            descripcion_plazo = f"máximo {self.plazoMaximo} {unidad}"
+        else:
+            descripcion_plazo = "sin restricción de plazo"
+
+        return f"{self.competencia} - {self.tipoAudiencia} ({descripcion_plazo})"
 
 
 # =====================================================

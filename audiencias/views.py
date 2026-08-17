@@ -22,11 +22,22 @@ services.py ni el formulario.
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
+# Decorador que restringe el acceso únicamente a solicitudes POST.
+# Se usa en guardar_anotacion_audiencia porque esa vista modifica
+# datos: mismo criterio que cambiar_estado_sala/
+# cambiar_agendamiento_automatico en otras apps del proyecto.
+from django.views.decorators.http import require_POST
+
 # Framework de mensajes para notificar el resultado de una acción.
 from django.contrib import messages
 
-# Funciones para renderizar plantillas HTML y redirigir a otra URL.
-from django.shortcuts import render, redirect
+# Funciones para renderizar plantillas HTML, redirigir a otra URL,
+# y obtener un objeto o responder 404 si no existe.
+from django.shortcuts import render, redirect, get_object_or_404
+
+# Construye la URL de "agenda_diaria" para redirigir con un
+# parámetro "?fecha=" (ver guardar_anotacion_audiencia).
+from django.urls import reverse
 
 # Fecha de hoy respetando la zona horaria configurada del
 # proyecto (TIME_ZONE = America/Santiago, USE_TZ=True). No se
@@ -52,18 +63,23 @@ from competencias.models import Competencia
 from salas.models import Sala
 from tipos_audiencia.models import TipoAudiencia
 
-# Formulario de entrada para registrar una audiencia.
-from .forms import AudienciaForm
+# Formularios de entrada: registrar una audiencia, y validar el
+# motivo al dejarla sin efecto.
+from .forms import AudienciaForm, DejarSinEfectoAudienciaForm, MotivoBaja
 
 # Modelo de audiencia del propio módulo: se usa en
 # ver_disponibilidad_audiencia para consultar (solo lectura)
 # qué bloques de una sala/fecha ya están ocupados.
 from .models import Audiencia, EstadoAudiencia
 
-# Servicios de negocio: coordinan la creación y generan
-# propuestas automáticas de fecha. Toda regla de negocio vive
-# aquí, no en esta vista.
-from .services import GeneradorPropuestaFecha, ServicioCreacionAudiencia
+# Servicios de negocio: coordinan la creación, la baja lógica, y
+# generan propuestas automáticas de fecha. Toda regla de negocio
+# vive aquí, no en esta vista.
+from .services import (
+    GeneradorPropuestaFecha,
+    ServicioBajaAudiencia,
+    ServicioCreacionAudiencia,
+)
 
 
 # =====================================================
@@ -245,6 +261,13 @@ def registrar_audiencia(request):
             usuario=request.user,
             fecha_referencia=timezone.localdate(),
             confirmarAdvertencias=confirmar_advertencias,
+            # Anotación libre asociada a la audiencia completa,
+            # armada en la interfaz mientras la audiencia todavía
+            # estaba solo "Seleccionada" (ver
+            # templates/audiencias/formulario.html: campo oculto
+            # "anotacion" dentro de este mismo <form>). No es un
+            # dato que se valide; se guarda tal como llega.
+            anotacion=form.cleaned_data.get("anotacion", ""),
         ).crear()
 
         # ---------------------------------------------
@@ -510,6 +533,22 @@ def ver_disponibilidad_audiencia(request):
         )
 
     # -------------------------------------------------
+    # "fecha" (string "AAAA-MM-DD", tal como llega de
+    # request.POST) se sigue usando tal cual para la consulta
+    # de más abajo -no se toca esa lógica-. fecha_disponibilidad
+    # es, en cambio, un objeto date, solo para que el template
+    # pueda mostrar "Jueves 14 de agosto de 2026" (día de la
+    # semana + fecha en español) junto a la tabla. parse_date
+    # devuelve None si el texto no tuviera un formato válido
+    # -no debería ocurrir, ya que siempre llega desde un
+    # <input type="date"> o desde el mismo formato que arma el
+    # script de navegación por flechas-, en cuyo caso el
+    # template simplemente no muestra el encabezado de fecha.
+    # -------------------------------------------------
+
+    fecha_disponibilidad = parse_date(fecha)
+
+    # -------------------------------------------------
     # Arma, para cada "orden" de bloque, qué Audiencia lo
     # ocupa (si alguna), a partir de bloqueInicio.orden +
     # cantidadBloques -mismo criterio de rango ya usado en
@@ -615,6 +654,7 @@ def ver_disponibilidad_audiencia(request):
             "disponibilidad": disponibilidad,
             "sala_disponibilidad": sala,
             "tipo_audiencia_seleccionado": tipo_audiencia_seleccionado,
+            "fecha_disponibilidad": fecha_disponibilidad,
         }
     )
 
@@ -720,5 +760,132 @@ def agenda_diaria(request):
             "fecha": fecha,
             "agenda_por_sala": agenda_por_sala,
             "hay_audiencias": bool(audiencias_por_sala),
+            # Opciones del <select> "Motivo de eliminación" del
+            # modal "Dejar sin efecto" (ver
+            # dejar_sin_efecto_audiencia más abajo). No es un
+            # dato de la agenda en sí: se pasa aquí porque el
+            # modal vive en este mismo template.
+            "motivos_baja": MotivoBaja.choices,
         }
+    )
+
+
+# =====================================================
+# ANOTACIÓN (audiencia ya registrada)
+# =====================================================
+
+@login_required
+@require_POST
+def guardar_anotacion_audiencia(request):
+    """
+    Agrega o modifica la anotación de una Audiencia YA
+    REGISTRADA: se accede desde el botón 📝 de una fila
+    "Ocupado" en la tabla de "Disponibilidad de agenda" (ver
+    templates/audiencias/formulario.html), distinto del campo
+    oculto "anotacion" del <form> principal -ese otro solo
+    aplica MIENTRAS la audiencia todavía está en estado
+    "Seleccionado", sin guardar (ver registrar_audiencia más
+    arriba)-.
+
+    La anotación pertenece a la audiencia completa (no a un
+    bloque individual ni a la causa): se guarda directamente
+    sobre el campo "anotacion" de la Audiencia indicada,
+    idéntico en espíritu a cambiar_estado_sala/
+    cambiar_agendamiento_automatico (otras apps del proyecto):
+    una actualización puntual de un único campo, sin repetir
+    ninguna regla de ValidadorAgendamiento ni de
+    ServicioCreacionAudiencia -la anotación no es un dato que
+    esas reglas validen ni que afecte el agendamiento-.
+
+    Tras guardar, redirige a la agenda diaria de la fecha de esa
+    audiencia (?fecha=...), para que el funcionario vea de
+    inmediato que el cambio se aplicó sobre la audiencia
+    correcta. No se modificó agenda_diaria ni su plantilla para
+    esto: solo se navega hacia esa vista ya existente, igual que
+    cualquier enlace del sidebar.
+
+    Si la audiencia no existe, responde con un error 404
+    (get_object_or_404).
+
+    Solo los usuarios autenticados pueden acceder a esta vista,
+    y solo mediante una solicitud POST.
+    """
+
+    audiencia = get_object_or_404(
+        Audiencia, pk=request.POST.get("audiencia_id")
+    )
+
+    audiencia.anotacion = (request.POST.get("anotacion") or "").strip()
+    audiencia.save(update_fields=["anotacion"])
+
+    if audiencia.anotacion:
+        messages.success(request, "Anotación guardada correctamente.")
+    else:
+        messages.success(request, "Anotación eliminada correctamente.")
+
+    return redirect(
+        f"{reverse('agenda_diaria')}?fecha={audiencia.fecha.isoformat()}"
+    )
+
+
+# =====================================================
+# BAJA LÓGICA (audiencia ya registrada)
+# =====================================================
+
+@login_required
+@require_POST
+def dejar_sin_efecto_audiencia(request):
+    """
+    Deja sin efecto (baja lógica) una Audiencia PROGRAMADA, con
+    motivo obligatorio (ver modal "Dejar sin efecto" en
+    templates/audiencias/agenda.html). Mismo criterio de acceso
+    que guardar_anotacion_audiencia: solo usuarios autenticados,
+    solo mediante una solicitud POST.
+
+    Toda la regla de negocio -no borrar físicamente, exigir
+    estado PROGRAMADA, registrar trazabilidad- vive en
+    ServicioBajaAudiencia; esta vista solo valida el motivo
+    recibido (DejarSinEfectoAudienciaForm), resuelve la Audiencia
+    y traduce el resultado del servicio a mensajes para el
+    funcionario.
+
+    Si el formulario de motivo es inválido (motivo faltante, o
+    "Otro" sin explicación), no se llama a ServicioBajaAudiencia:
+    no se guarda ni se modifica nada.
+
+    Si la audiencia no existe, responde con un error 404
+    (get_object_or_404, mismo criterio que
+    guardar_anotacion_audiencia).
+
+    Tras la operación -exitosa o no- redirige a la agenda diaria
+    de la fecha de esa audiencia, igual que
+    guardar_anotacion_audiencia.
+    """
+
+    audiencia = get_object_or_404(
+        Audiencia, pk=request.POST.get("audiencia_id")
+    )
+
+    form = DejarSinEfectoAudienciaForm(request.POST)
+
+    if form.is_valid():
+        resultado = ServicioBajaAudiencia(
+            audiencia=audiencia,
+            usuario=request.user,
+            motivo=form.motivo_texto(),
+        ).ejecutar()
+
+        if resultado["exito"]:
+            messages.success(
+                request, "Audiencia dejada sin efecto correctamente."
+            )
+        else:
+            messages.error(request, resultado["error"])
+    else:
+        for errores_campo in form.errors.values():
+            for error in errores_campo:
+                messages.error(request, error)
+
+    return redirect(
+        f"{reverse('agenda_diaria')}?fecha={audiencia.fecha.isoformat()}"
     )

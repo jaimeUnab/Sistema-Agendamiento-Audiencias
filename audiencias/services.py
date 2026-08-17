@@ -130,6 +130,37 @@ def _rangosSeSolapan(inicio_a, fin_a, inicio_b, fin_b):
     return inicio_a <= fin_b and inicio_b <= fin_a
 
 
+def _dentroDePlazo(dias_transcurridos, regla):
+    """
+    Indica si "dias_transcurridos" cae dentro del plazo legal
+    configurado en "regla".
+
+    ReglaAgendamiento.plazoMinimo y plazoMaximo son opcionales
+    de forma independiente (null=True cada uno); esta función
+    interpreta las cuatro combinaciones posibles:
+
+    - Ambos configurados: deben cumplirse los dos límites
+      (plazoMinimo <= dias_transcurridos <= plazoMaximo).
+    - Solo plazoMinimo configurado: se exige únicamente ese
+      piso (dias_transcurridos >= plazoMinimo), sin tope
+      superior.
+    - Solo plazoMaximo configurado: se exige únicamente ese
+      tope (dias_transcurridos <= plazoMaximo), sin piso
+      mínimo.
+    - Ninguno configurado: no hay restricción de plazo; toda
+      fecha se considera dentro de plazo.
+
+    Usada tanto por ValidadorAgendamiento.validarPlazoLegal()
+    como por GeneradorPropuestaFecha.generar(), para no
+    duplicar esta interpretación en los dos lugares.
+    """
+    if regla.plazoMinimo is not None and dias_transcurridos < regla.plazoMinimo:
+        return False
+    if regla.plazoMaximo is not None and dias_transcurridos > regla.plazoMaximo:
+        return False
+    return True
+
+
 # =====================================================
 # VALIDADOR DE AGENDAMIENTO
 # =====================================================
@@ -329,7 +360,7 @@ class ValidadorAgendamiento:
         else:
             dias_transcurridos = _contarDiasHabiles(self.fecha_referencia, a.fecha)
 
-        if not (regla.plazoMinimo <= dias_transcurridos <= regla.plazoMaximo):
+        if not _dentroDePlazo(dias_transcurridos, regla):
             self.advertencias.append(
                 "La fecha seleccionada se encuentra fuera del plazo "
                 "legal configurado."
@@ -511,7 +542,7 @@ class GeneradorPropuestaFecha:
                     self.fecha_referencia, fecha_actual
                 )
 
-            if regla.plazoMinimo <= dias_transcurridos <= regla.plazoMaximo:
+            if _dentroDePlazo(dias_transcurridos, regla):
                 dentro_de_plazo.append(propuesta)
             else:
                 propuesta["fueraDePlazo"] = True
@@ -683,6 +714,7 @@ class ServicioTrazabilidad:
             ),
             "estado": audiencia.estado,
             "motivoBaja": audiencia.motivoBaja,
+            "anotacion": audiencia.anotacion,
             "fechaCreacion": (
                 audiencia.fechaCreacion.isoformat()
                 if audiencia.fechaCreacion
@@ -742,6 +774,75 @@ class ServicioTrazabilidad:
 
 
 # =====================================================
+# SERVICIO DE BAJA LÓGICA DE AUDIENCIA
+# =====================================================
+
+class ServicioBajaAudiencia:
+    """
+    Deja sin efecto (baja lógica) una Audiencia PROGRAMADA,
+    guardando el motivo ingresado por el funcionario.
+
+    REGLA PRINCIPAL DEL DISEÑO: nunca llama a audiencia.delete().
+    El registro permanece siempre en la base de datos, para
+    conservar su historial y trazabilidad (ver docstring de
+    Audiencia.estado en audiencias/models.py); esta clase solo
+    cambia estado -> ELIMINADA, guarda motivoBaja, y delega en
+    ServicioTrazabilidad el registro de la operación.
+
+    Solo se permite dar de baja una audiencia que esté
+    actualmente PROGRAMADA. Si ya está ELIMINADA, no se aplica
+    ningún cambio (ni de estado, ni de motivo) ni se crea
+    trazabilidad nueva: se informa como error, mismo criterio que
+    los errores bloqueantes de ValidadorAgendamiento.
+    """
+
+    MENSAJE_YA_ELIMINADA = (
+        "Esta audiencia ya fue dejada sin efecto anteriormente."
+    )
+
+    def __init__(self, audiencia, usuario, motivo):
+        self.audiencia = audiencia
+        self.usuario = usuario
+        self.motivo = motivo
+
+    def ejecutar(self):
+        """
+        Devuelve:
+            {
+                "exito": bool,
+                "error": str | None,
+                "registroTrazabilidad": RegistroTrazabilidad | None,
+            }
+        """
+        if self.audiencia.estado != EstadoAudiencia.PROGRAMADA:
+            return {
+                "exito": False,
+                "error": self.MENSAJE_YA_ELIMINADA,
+                "registroTrazabilidad": None,
+            }
+
+        # Fotografía ANTES de modificar, tal como exige el
+        # contrato documentado en ServicioTrazabilidad: una vez
+        # guardado el nuevo estado, el estado anterior ya no
+        # existe en la instancia.
+        anterior = ServicioTrazabilidad.fotografiar(self.audiencia)
+
+        with transaction.atomic():
+            self.audiencia.estado = EstadoAudiencia.ELIMINADA
+            self.audiencia.motivoBaja = self.motivo
+            self.audiencia.save(update_fields=["estado", "motivoBaja"])
+            registro = ServicioTrazabilidad.registrarBaja(
+                self.audiencia, self.usuario, valoresAnteriores=anterior
+            )
+
+        return {
+            "exito": True,
+            "error": None,
+            "registroTrazabilidad": registro,
+        }
+
+
+# =====================================================
 # SERVICIO DE CREACIÓN DE AUDIENCIA
 # =====================================================
 
@@ -796,6 +897,7 @@ class ServicioCreacionAudiencia:
         usuario,
         fecha_referencia,
         confirmarAdvertencias=False,
+        anotacion="",
     ):
         self.causa = causa
         self.tipoAudiencia = tipoAudiencia
@@ -805,6 +907,12 @@ class ServicioCreacionAudiencia:
         self.bloqueInicio = bloqueInicio
         self.usuario = usuario
         self.fecha_referencia = fecha_referencia
+        # Anotación libre asociada a la audiencia completa (no a
+        # un bloque individual). No es un dato que
+        # ValidadorAgendamiento valide ni que afecte ninguna
+        # regla de agendamiento: solo se guarda junto con el
+        # resto de la Audiencia en el Paso 4 (crear()).
+        self.anotacion = anotacion or ""
         self.confirmarAdvertencias = confirmarAdvertencias
 
     # =================================================
@@ -860,6 +968,7 @@ class ServicioCreacionAudiencia:
             horaInicio=self.bloqueInicio.horaInicio if self.bloqueInicio else None,
             horaTermino=bloque_final.horaTermino if bloque_final else None,
             usuarioCreacion=self.usuario,
+            anotacion=self.anotacion,
         )
 
         # ---------------------------------------------

@@ -12,6 +12,11 @@ entrada al registrar una nueva audiencia.
 # Formularios base de Django.
 from django import forms
 
+# Únicamente para declarar MotivoBaja como TextChoices (un enum de
+# Python, no un campo de modelo): no agrega ningún campo a
+# Audiencia ni requiere migración.
+from django.db import models
+
 # Modelos de las relaciones que el formulario ofrece elegir.
 from bloques.models import BloqueHorario
 from competencias.models import Competencia
@@ -40,11 +45,16 @@ class AudienciaForm(forms.ModelForm):
     formulario no hace esa búsqueda, solo entrega
     "competencia"/"rit" ya validados como datos de entrada.
 
-    Incluye además los cinco campos propios de Audiencia que sí
+    Incluye además los seis campos propios de Audiencia que sí
     selecciona el funcionario (tipoAudiencia, sala,
-    cantidadBloques, fecha, bloqueInicio). No incluye
+    cantidadBloques, fecha, bloqueInicio, anotacion). No incluye
     horaInicio, horaTermino, fechaCreacion, estado, motivoBaja
     ni usuarioCreacion: esos los determina el flujo de negocio.
+    "anotacion" es opcional (blank=True en el modelo, por lo que
+    ModelForm ya genera required=False sin necesidad de
+    declararlo aparte) y se gestiona desde la interfaz mediante
+    un botón/modal, no como un campo de texto visible permanente
+    (ver templates/audiencias/formulario.html).
 
     IMPORTANTE: este formulario NO implementa form.save(), y no
     debe usarse para guardar una Audiencia directamente. Toda
@@ -110,6 +120,7 @@ class AudienciaForm(forms.ModelForm):
             "cantidadBloques",
             "fecha",
             "bloqueInicio",
+            "anotacion",
         ]
 
         widgets = {
@@ -173,3 +184,100 @@ class AudienciaForm(forms.ModelForm):
         """
 
         return self.cleaned_data["rit"].strip()
+
+
+# =====================================================
+# BAJA LÓGICA: MOTIVO
+# =====================================================
+
+class MotivoBaja(models.TextChoices):
+    """
+    Categorías de motivo para dejar sin efecto (baja lógica) una
+    Audiencia.
+
+    NO es el choices= de ningún campo de modelo: Audiencia.
+    motivoBaja sigue siendo un CharField de texto libre, sin
+    cambios ni migración. Estas categorías existen únicamente
+    para poblar el <select> del modal de "Dejar sin efecto" y
+    para validar en DejarSinEfectoAudienciaForm; el texto final
+    que se guarda en motivoBaja es la etiqueta elegida (y, si es
+    OTRO, también la explicación ingresada por el funcionario).
+    """
+
+    SUSPENSION = "SUSPENSION", "Suspensión de la audiencia"
+    REPROGRAMACION = "REPROGRAMACION", "Reprogramación"
+    ERROR_AGENDAMIENTO = "ERROR_AGENDAMIENTO", "Error de agendamiento"
+    SOLICITUD_TRIBUNAL = "SOLICITUD_TRIBUNAL", "Solicitud del tribunal"
+    OTRO = "OTRO", "Otro"
+
+
+class DejarSinEfectoAudienciaForm(forms.Form):
+    """
+    Valida el motivo por el cual se deja sin efecto una
+    Audiencia.
+
+    No es un ModelForm de Audiencia: solo valida el motivo,
+    nunca decide el estado ni guarda nada -eso es
+    responsabilidad exclusiva de ServicioBajaAudiencia-.
+    "audiencia_id" no se declara como campo aquí: se lee
+    directamente de request.POST en la vista, mismo criterio que
+    guardar_anotacion_audiencia (audiencias/views.py) ya usa
+    para el mismo dato.
+    """
+
+    motivo_seleccionado = forms.ChoiceField(
+        choices=MotivoBaja.choices,
+        label="Motivo de eliminación",
+        error_messages={
+            "required": "Debes seleccionar un motivo.",
+            "invalid_choice": "El motivo seleccionado no es válido.",
+        },
+    )
+
+    # Solo obligatorio cuando motivo_seleccionado == OTRO; esa
+    # regla condicional se aplica en clean(), no aquí (un
+    # required=True fijo rechazaría siempre las otras 4 opciones).
+    motivo_otro = forms.CharField(
+        required=False,
+        max_length=200,
+        label="Explicación adicional",
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+
+    def clean(self):
+        """
+        Si se eligió OTRO, exige una explicación no vacía (con
+        espacios accidentales ya recortados). Para el resto de
+        las opciones, motivo_otro se ignora aunque venga con
+        texto: no se combina con la etiqueta.
+        """
+
+        cleaned_data = super().clean()
+        seleccionado = cleaned_data.get("motivo_seleccionado")
+        otro = (cleaned_data.get("motivo_otro") or "").strip()
+
+        if seleccionado == MotivoBaja.OTRO and not otro:
+            self.add_error(
+                "motivo_otro",
+                "Debes ingresar una explicación cuando el motivo es 'Otro'.",
+            )
+
+        cleaned_data["motivo_otro"] = otro
+        return cleaned_data
+
+    def motivo_texto(self):
+        """
+        Arma el texto final a guardar en Audiencia.motivoBaja: la
+        etiqueta legible del motivo elegido, y si es OTRO, agrega
+        la explicación ingresada separada por ": ". Solo debe
+        llamarse después de is_valid() == True (usa
+        self.cleaned_data directamente, sin valores por defecto).
+        """
+
+        seleccionado = self.cleaned_data["motivo_seleccionado"]
+        etiqueta = MotivoBaja(seleccionado).label
+
+        if seleccionado == MotivoBaja.OTRO:
+            return f"{etiqueta}: {self.cleaned_data['motivo_otro']}"
+
+        return etiqueta

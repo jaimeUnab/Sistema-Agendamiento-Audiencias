@@ -186,7 +186,37 @@
                 dentro de la pestaña "Días Bloqueados" de Reglas de
                 Agendamiento), por lo que la sección colapsable
                 mantiene los seis ítems que existen hoy, no siete.
+
+                CONTROL DE ACCESO POR ROL: toda esta sección -el
+                encabezado "Configuración" y sus seis ítems- queda
+                envuelta en una condición que solo la deja pasar si
+                el usuario autenticado es superusuario de Django o
+                tiene el rol Administrador (comparando directamente
+                contra el valor almacenado por RolUsuario.ADMINISTRADOR,
+                ver usuarios/models.py). Un usuario con rol Usuario/
+                Funcionario nunca ve este menú, ni siquiera colapsado:
+                el bloque completo no se renderiza en el HTML que
+                recibe su navegador. No se usa el método tieneRol()
+                que el modelo ya define, porque el lenguaje de
+                templates de Django no permite invocar un método
+                pasándole un argumento; se compara el valor crudo del
+                campo en su lugar. Es el mismo criterio que ya
+                protege cada una de estas vistas del lado del
+                servidor (ver usuarios/decorators.py, función
+                solo_administrador): esta condición de acá es solo la
+                capa de interfaz, la que de verdad impide el acceso
+                es la del servidor. La etiqueta de control de flujo
+                que aplica esta condición se escribe siempre DESPUÉS
+                de este comentario, nunca dentro de él: escrita
+                dentro, Django la interpretaría igualmente -las
+                etiquetas de plantilla se procesan aunque estén
+                dentro de un comentario HTML-, quedando sin su cierre
+                correspondiente dentro del propio comentario y
+                rompiendo el resto de la plantilla (mismo tipo de
+                error ya documentado antes en este archivo).
             -->
+
+            {% if request.user.is_superuser or request.user.rol == 'ADMINISTRADOR' %}
 
             <a href="#menuConfiguracion"
                class="menu-item {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}active{% endif %}"
@@ -277,6 +307,8 @@
 
             </div>
 
+            {% endif %}
+
         </nav>
 
 
@@ -298,6 +330,19 @@
         <div class="sidebar-footer">
 
             <!-- Usuario del sistema -->
+            <!--
+                Antes mostraba el texto fijo "Funcionario" / "Tribunal"
+                para cualquier usuario. Se reemplaza por los datos
+                reales del usuario autenticado (request.user, ya
+                disponible en todos los templates sin pasarlo por
+                contexto): "nombre" es el campo real del modelo Usuario
+                (usuarios/models.py), y "get_rol_display" es el método
+                que Django genera automáticamente para cualquier campo
+                con choices -aquí "rol"-, y ya se usa con el mismo
+                criterio en templates/usuarios/lista.html (columna
+                "Rol"): "Administrador" o "Usuario" según corresponda,
+                nunca el texto fijo "Funcionario".
+            -->
 
             <div class="sidebar-user">
 
@@ -309,9 +354,9 @@
 
                 <div class="user-info">
 
-                    <strong>Funcionario</strong>
+                    <strong>{{ request.user.nombre }}</strong>
 
-                    <small>Tribunal</small>
+                    <small>{{ request.user.get_rol_display }}</small>
 
                 </div>
 
@@ -378,6 +423,9 @@
 
 
             <!-- Usuario superior -->
+            <!-- Mismo criterio que ".sidebar-user" (ver su comentario
+                 más arriba): datos reales de request.user, no texto
+                 fijo. -->
 
             <div class="top-user">
 
@@ -385,9 +433,9 @@
 
                 <div>
 
-                    <strong>Funcionario</strong><br>
+                    <strong>{{ request.user.nombre }}</strong><br>
 
-                    <small>Tribunal</small>
+                    <small>{{ request.user.get_rol_display }}</small>
 
                 </div>
 

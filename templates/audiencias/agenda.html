@@ -83,6 +83,7 @@ Agenda diaria
                         <th>Tipo de audiencia</th>
                         <th>Cantidad de bloques</th>
                         <th>Estado</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -97,6 +98,27 @@ Agenda diaria
                         <td>{{ audiencia.tipoAudiencia.nombre }}</td>
                         <td>{{ audiencia.cantidadBloques }}</td>
                         <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
+                        <td>
+                            <!-- Todas las filas de esta tabla ya son
+                                 PROGRAMADA (agenda_diaria filtra por ese
+                                 estado): no hace falta una condición
+                                 adicional para mostrar este botón solo
+                                 en ese caso. El botón no envía nada por
+                                 sí mismo: solo abre el modal compartido
+                                 "modalDejarSinEfecto" (ver más abajo),
+                                 pasándole los datos de esta fila vía
+                                 data-* (mismo patrón que
+                                 fila.dataset.bloque/hora en
+                                 templates/audiencias/formulario.html). -->
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    data-audiencia-id="{{ audiencia.id }}"
+                                    data-rit="{{ audiencia.causa.rit }}"
+                                    data-caratula="{{ audiencia.causa.caratulado }}"
+                                    onclick="abrirModalDejarSinEfecto(this)">
+                                Dejar sin efecto
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -112,5 +134,107 @@ Agenda diaria
 
 </div>
 {% endfor %}
+
+<!-- ========================================= -->
+<!--   MODAL: DEJAR SIN EFECTO AUDIENCIA        -->
+<!-- ========================================= -->
+<!-- Único modal compartido por todas las filas de esta pantalla
+     (mismo criterio que modalCantidadBloques/modalAnotacion en
+     templates/audiencias/formulario.html): abrirModalDejarSinEfecto()
+     copia RIT/carátula/audiencia_id del botón clickeado (data-*)
+     dentro de este modal antes de mostrarlo, en vez de renderizar
+     un modal por cada audiencia.
+
+     Es un <form method="post"> real dirigido a
+     dejar_sin_efecto_audiencia: el envío ocurre solo si el
+     funcionario presiona "Dejar sin efecto" dentro del modal
+     (botón type="submit"), nunca al abrirlo. -->
+
+<div class="modal fade" id="modalDejarSinEfecto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'dejar_sin_efecto_audiencia' %}">
+            {% csrf_token %}
+            <input type="hidden" name="audiencia_id" id="modal-baja-audiencia-id">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">Dejar sin efecto audiencia</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <p class="mb-1"><strong>RIT:</strong> <span id="modal-baja-rit"></span></p>
+                    <p class="mb-3"><strong>Carátula:</strong> <span id="modal-baja-caratula"></span></p>
+
+                    <p>¿Desea dejar sin efecto esta audiencia?</p>
+
+                    <div class="mb-3">
+                        <label for="id_motivo_seleccionado" class="form-label">Motivo de eliminación</label>
+                        <select name="motivo_seleccionado" id="id_motivo_seleccionado" class="form-select" required>
+                            <option value="" selected disabled>Seleccione un motivo…</option>
+                            {% for valor, etiqueta in motivos_baja %}
+                            <option value="{{ valor }}">{{ etiqueta }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Oculto por defecto: solo se muestra (y se vuelve
+                         obligatorio) cuando el motivo elegido es "Otro"
+                         (ver el listener de "change" en el <script> de
+                         más abajo). -->
+                    <div id="contenedor-motivo-otro" class="d-none">
+                        <label for="id_motivo_otro" class="form-label">Explicación adicional</label>
+                        <textarea name="motivo_otro" id="id_motivo_otro" rows="2" class="form-control"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        Dejar sin efecto
+                    </button>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Copia los datos de la fila clickeada (RIT, carátula, id de la
+    // audiencia) al modal compartido, y reinicia el motivo/explicación
+    // de cualquier apertura anterior antes de mostrarlo.
+    function abrirModalDejarSinEfecto(boton) {
+        document.getElementById("modal-baja-audiencia-id").value = boton.dataset.audienciaId;
+        document.getElementById("modal-baja-rit").textContent = boton.dataset.rit;
+        document.getElementById("modal-baja-caratula").textContent = boton.dataset.caratula;
+
+        var selectMotivo = document.getElementById("id_motivo_seleccionado");
+        var campoOtro = document.getElementById("id_motivo_otro");
+
+        selectMotivo.value = "";
+        campoOtro.value = "";
+        document.getElementById("contenedor-motivo-otro").classList.add("d-none");
+        campoOtro.required = false;
+
+        var modal = new bootstrap.Modal(document.getElementById("modalDejarSinEfecto"));
+        modal.show();
+    }
+
+    // Muestra el campo de explicación (y lo vuelve obligatorio en el
+    // navegador) únicamente cuando el motivo elegido es "Otro". La
+    // validación real y obligatoria ocurre igualmente en el servidor
+    // (DejarSinEfectoAudienciaForm.clean()), esto es solo UX.
+    document.getElementById("id_motivo_seleccionado").addEventListener("change", function () {
+        var esOtro = this.value === "OTRO";
+        document.getElementById("contenedor-motivo-otro").classList.toggle("d-none", !esOtro);
+        document.getElementById("id_motivo_otro").required = esOtro;
+    });
+</script>
 
 {% endblock %}

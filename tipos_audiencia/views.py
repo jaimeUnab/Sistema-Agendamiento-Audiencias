@@ -12,6 +12,11 @@ audiencia (HU-13) del sistema.
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
+# Decorador que restringe el acceso a usuarios con rol
+# Administrador: Tipos de Audiencia es un módulo de
+# Configuración (ver usuarios/decorators.py).
+from usuarios.decorators import solo_administrador
+
 # Función para renderizar plantillas HTML.
 from django.shortcuts import render
 
@@ -24,13 +29,15 @@ from .models import TipoAudiencia
 # =====================================================
 
 @login_required
+@solo_administrador
 def lista_tipos_audiencia(request):
     """
     Muestra el listado de tipos de audiencia registrados
     en el sistema.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista:
+    Tipos de Audiencia es un módulo de Configuración.
     """
 
     # -------------------------------------------------

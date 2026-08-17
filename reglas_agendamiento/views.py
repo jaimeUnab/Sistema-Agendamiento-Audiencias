@@ -29,6 +29,11 @@ administra su contenido.
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
+# Decorador que restringe el acceso a usuarios con rol
+# Administrador: TODO este módulo (Reglas de Agendamiento, sus
+# cuatro pestañas) es Configuración (ver usuarios/decorators.py).
+from usuarios.decorators import solo_administrador
+
 # Decorador que restringe el acceso únicamente a solicitudes POST.
 # Se usa en las vistas "cambiar_estado_*" porque modifican datos:
 # igual que en Salas/Bloques/DiaAtencion, una acción que cambia el
@@ -85,6 +90,7 @@ from .models import DiaAtencion, DiaSemana, ReglaAgendamiento
 # =====================================================
 
 @login_required
+@solo_administrador
 def configuracion_general(request):
     """
     Muestra y permite editar la configuración general de
@@ -147,6 +153,7 @@ def configuracion_general(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 def lista_reglas_agendamiento(request):
     """
     Muestra el listado de reglas de plazo legal
@@ -181,6 +188,7 @@ def lista_reglas_agendamiento(request):
 
 
 @login_required
+@solo_administrador
 def crear_regla_agendamiento(request):
     """
     Permite configurar una regla de plazo legal
@@ -261,6 +269,7 @@ def crear_regla_agendamiento(request):
 
 
 @login_required
+@solo_administrador
 def editar_regla_agendamiento(request, pk):
     """
     Permite modificar una ReglaAgendamiento existente
@@ -318,6 +327,7 @@ def editar_regla_agendamiento(request, pk):
 
 
 @login_required
+@solo_administrador
 @require_POST
 def cambiar_estado_regla_agendamiento(request, pk):
     """
@@ -360,6 +370,7 @@ def cambiar_estado_regla_agendamiento(request, pk):
 # =====================================================
 
 @login_required
+@solo_administrador
 def dias_atencion(request):
     """
     Muestra la matriz Competencia × Día de la semana de días de
@@ -423,6 +434,7 @@ def dias_atencion(request):
 
 
 @login_required
+@solo_administrador
 @require_POST
 def guardar_dias_atencion(request):
     """
@@ -521,6 +533,7 @@ def guardar_dias_atencion(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 def dias_bloqueados(request):
     """
     Muestra el listado de días no disponibles
@@ -550,6 +563,7 @@ def dias_bloqueados(request):
 
 
 @login_required
+@solo_administrador
 def crear_dia_no_disponible(request):
     """
     Permite registrar una fecha no disponible
@@ -631,6 +645,7 @@ def crear_dia_no_disponible(request):
 
 
 @login_required
+@solo_administrador
 def editar_dia_no_disponible(request, pk):
     """
     Permite modificar un DiaNoDisponible existente (fecha,
@@ -687,6 +702,7 @@ def editar_dia_no_disponible(request, pk):
 
 
 @login_required
+@solo_administrador
 @require_POST
 def cambiar_estado_dia_no_disponible(request, pk):
     """

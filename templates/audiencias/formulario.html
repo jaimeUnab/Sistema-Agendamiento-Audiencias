@@ -170,6 +170,7 @@ Nueva Audiencia
 
         <!-- ----------------------------------------------- -->
         <!--   COLUMNA IZQUIERDA: SELECCIÓN MANUAL DE FECHA   -->
+        <!--   + BÚSQUEDA AUTOMÁTICA (propuestas)             -->
         <!-- ----------------------------------------------- -->
 
         <div class="col-md-4">
@@ -200,6 +201,113 @@ Nueva Audiencia
                             class="btn btn-outline-primary mt-3 w-100">
                         Ver disponibilidad
                     </button>
+
+                    <!-- ============================= -->
+                    <!--  BÚSQUEDA AUTOMÁTICA           -->
+                    <!-- ============================= -->
+                    <!-- Reordenamiento puramente visual: esta sección
+                         (botón "Solicitar propuestas" + resultado)
+                         vivía antes dentro de la tarjeta "Disponibilidad
+                         de agenda", debajo de "Configuración de la
+                         audiencia". Se traslada aquí, bajo "Ver
+                         disponibilidad", a pedido explícito. Es el
+                         mismo botón y el mismo bucle "propuestas" de
+                         siempre -mismo formaction, mismo
+                         formnovalidate, mismo <form id="form-audiencia">
+                         que envuelve toda la pantalla, mismo
+                         usarPropuesta() del <script> de más abajo-,
+                         solo cambia su posición en el HTML: no se
+                         duplicó ni se recreó ningún control. -->
+
+                    <hr class="mt-4">
+
+                    <h6 class="fw-bold">Búsqueda automática</h6>
+
+                    <!-- Antes este botón enviaba el formulario
+                         directamente (type="submit"). Ahora abre primero
+                         un modal preguntando la cantidad de bloques
+                         (mismo patrón que el modal "¿Cuántos bloques
+                         ocupará la audiencia?" de la selección manual,
+                         más abajo): el envío real hacia
+                         proponer_fechas_audiencia ocurre recién al
+                         confirmar ese modal, mediante el botón oculto
+                         "btn-solicitar-propuestas" de más abajo, que
+                         conserva exactamente el mismo formaction/
+                         formnovalidate que tenía este botón antes del
+                         cambio. No se creó ningún endpoint, servicio ni
+                         lógica de búsqueda nueva: GeneradorPropuestaFecha
+                         y proponer_fechas_audiencia (audiencias/views.py)
+                         siguen siendo los mismos de siempre, ya
+                         preparados para cualquier cantidad de bloques y
+                         para plazo mínimo/máximo opcionales -ver
+                         audiencias/services.py:_dentroDePlazo()-; lo
+                         único nuevo es este paso de confirmación en la
+                         interfaz. -->
+                    <button type="button"
+                            onclick="abrirModalBusquedaAutomatica()"
+                            class="btn btn-outline-primary w-100">
+                        Solicitar propuestas
+                    </button>
+
+                    <!-- Disparador real del envío, oculto (d-none):
+                         mismo formaction/formnovalidate que tenía el
+                         botón visible antes de este cambio.
+                         confirmarBusquedaAutomatica() lo "presiona" por
+                         código -igual que actualizarDisponibilidad() ya
+                         hace con "btn-ver-disponibilidad"-, después de
+                         copiar la cantidad elegida en el modal al campo
+                         REAL cantidadBloques (el mismo que usa la
+                         selección manual, sin crear un segundo campo
+                         que viaje al servidor). -->
+                    <button type="submit"
+                            id="btn-solicitar-propuestas"
+                            formaction="{% url 'proponer_fechas_audiencia' %}"
+                            formnovalidate
+                            class="d-none">
+                        Solicitar propuestas
+                    </button>
+
+                    <!-- Propuestas automáticas (GeneradorPropuestaFecha),
+                         solo si se solicitaron. -->
+                    {% if propuestas %}
+                    <div class="mt-3">
+                        {% for propuesta in propuestas %}
+                        <div class="border rounded p-3 mb-2">
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Propuesta {{ forloop.counter }}</strong>
+                                {% if propuesta.fueraDePlazo %}
+                                    <span class="badge bg-warning text-dark">Fuera de plazo legal</span>
+                                {% endif %}
+                            </div>
+
+                            <p class="mb-1">
+                                {{ propuesta.fecha|date:"d/m/Y" }} ·
+                                {{ propuesta.horaInicio|time:"H:i" }} - {{ propuesta.horaTermino|time:"H:i" }} ·
+                                {{ propuesta.sala }} · {{ propuesta.cantidadBloques }} bloque(s)
+                            </p>
+
+                            {% for advertencia_propuesta in propuesta.advertencias %}
+                                <p class="text-warning mb-1">{{ advertencia_propuesta }}</p>
+                            {% endfor %}
+
+                            <!-- Botón type="button": no envía nada ni recarga
+                                 la página, solo completa fecha/bloqueInicio
+                                 del formulario principal mediante JavaScript.
+                                 El funcionario sigue pudiendo modificarlos
+                                 antes de guardar. -->
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-success"
+                                    data-fecha="{{ propuesta.fecha|date:'Y-m-d' }}"
+                                    data-bloque="{{ propuesta.bloqueInicio.pk }}"
+                                    onclick="usarPropuesta(this)">
+                                Usar esta propuesta
+                            </button>
+
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
 
                 </div>
 
@@ -275,6 +383,57 @@ Nueva Audiencia
                          término de un rango de varios bloques, sin volver
                          a consultar el servidor. -->
                     {% if disponibilidad %}
+
+                    <!-- ============================= -->
+                    <!--  NAVEGADOR DE FECHA CONSULTADA -->
+                    <!-- ============================= -->
+                    <!-- Muestra la fecha exacta que la tabla de abajo
+                         está mostrando (fecha_disponibilidad, un date
+                         armado en la vista a partir del mismo "fecha"
+                         ya usado para la consulta -ver
+                         ver_disponibilidad_audiencia en views.py-, así
+                         que nunca puede desincronizarse de lo que
+                         realmente aparece en la tabla). "l j \d\e F
+                         \d\e Y" es el formato de fecha de Django
+                         (LANGUAGE_CODE="es-cl", ver config/settings.py):
+                         "l" y "F" son el día de la semana y el mes
+                         completos, ya traducidos al español por el
+                         propio Django, sin tabla de traducción propia;
+                         "capfirst" solo pone mayúscula la primera letra
+                         ("jueves" -> "Jueves"), igual que el ejemplo
+                         pedido.
+
+                         Las flechas NO hacen ninguna consulta nueva por
+                         su cuenta: cambiarDiaConsultado() (ver <script>
+                         al final) solo suma o resta un día al MISMO
+                         campo real "id_fecha" que usa "Selección manual
+                         de fecha" -por eso ambas fechas de la pantalla
+                         nunca pueden mostrar valores distintos, es
+                         literalmente el mismo campo- y reutiliza
+                         actualizarDisponibilidad(), la misma función
+                         que ya dispara "Ver disponibilidad" para
+                         cualquier otro cambio (bloque, cantidad,
+                         propuesta elegida). Sala, causa, tipo de
+                         audiencia y cantidad de bloques viajan igual
+                         que siempre porque es el mismo <form> completo
+                         el que se reenvía: no se tocó nada de eso. -->
+
+                    <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+                        <button type="button"
+                                onclick="cambiarDiaConsultado(-1)"
+                                class="btn btn-sm btn-outline-secondary"
+                                aria-label="Día anterior">
+                            &lsaquo;
+                        </button>
+                        <strong>{{ fecha_disponibilidad|date:"l j \d\e F \d\e Y"|capfirst }}</strong>
+                        <button type="button"
+                                onclick="cambiarDiaConsultado(1)"
+                                class="btn btn-sm btn-outline-secondary"
+                                aria-label="Día siguiente">
+                            &rsaquo;
+                        </button>
+                    </div>
+
                     <div class="table-responsive disponibilidad-scroll mb-3">
                         <table id="tabla-disponibilidad" class="table table-sm table-hover align-middle mb-0">
                             <thead>
@@ -303,7 +462,23 @@ Nueva Audiencia
                                         <td>{{ item.audiencia.causa.rit }}</td>
                                         <td>{{ item.audiencia.causa.caratulado }}</td>
                                         <td>{{ item.audiencia.tipoAudiencia.nombre }}</td>
-                                        <td><span class="badge bg-danger">Ocupado</span></td>
+                                        <td>
+                                            <span class="badge bg-danger">Ocupado</span>
+                                            <!-- Anotación de esta audiencia YA registrada
+                                                 (distinta del campo oculto "anotacion" del
+                                                 <form> principal, que solo aplica mientras
+                                                 una audiencia nueva está en estado
+                                                 "Seleccionado", sin guardar). "escapejs"
+                                                 vuelve segura la anotación real -puede
+                                                 traer comillas, saltos de línea, etc.- para
+                                                 incluirla dentro de un atributo onclick. -->
+                                            <button type="button"
+                                                    class="btn btn-sm btn-link p-0 ms-1"
+                                                    onclick="abrirModalAnotacionExistente({{ item.audiencia.pk }}, '{{ item.audiencia.anotacion|escapejs }}')"
+                                                    title="{% if item.audiencia.anotacion %}Modificar anotación{% else %}Agregar anotación{% endif %}">
+                                                📝
+                                            </button>
+                                        </td>
                                     {% elif item.seleccionado %}
                                         <td>{{ causa_encontrada.rit }}</td>
                                         <td>{{ causa_encontrada.caratulado }}</td>
@@ -349,8 +524,13 @@ Nueva Audiencia
                          calculan a partir de datos que ya están en el HTML
                          de la tabla de arriba (data-hora/data-hora-termino
                          de cada fila), sin volver a consultar el servidor.
-                         "Solicitar propuestas" pertenece funcionalmente a
-                         esta tarjeta y permanece dentro de ella. -->
+                         "Solicitar propuestas" y el resultado de las
+                         propuestas ya NO viven en esta tarjeta: se
+                         movieron a la columna izquierda, sección
+                         "Búsqueda automática" (ver más arriba, dentro
+                         del mismo <form>). Esta tarjeta conserva
+                         únicamente lo referido a la selección manual
+                         por clic en la tabla. -->
 
                     <div class="border rounded p-3 bg-light">
 
@@ -358,8 +538,28 @@ Nueva Audiencia
 
                         <div class="d-none">
                             {{ form.bloqueInicio }}
+                            <!-- Anotación de la audiencia que se está armando
+                                 (todavía no guardada): mismo criterio que
+                                 bloqueInicio arriba -campo real del formulario,
+                                 oculto, completado por código, nunca visible
+                                 como cuadro de texto permanente-. Se gestiona
+                                 con el botón/modal de más abajo
+                                 (abrirModalAnotacionPendiente/
+                                 confirmarAnotacion), no editándolo
+                                 directamente. Viaja con el resto del <form>
+                                 igual que cualquier otro campo: si el
+                                 funcionario presiona "Guardar audiencia"/
+                                 "Confirmar programación", ServicioCreacionAudiencia
+                                 la guarda junto con la Audiencia (ver
+                                 registrar_audiencia en views.py); si en cambio
+                                 navega a "Cancelar" o "← Volver", la pantalla
+                                 se recarga en blanco y este valor se descarta
+                                 junto con toda la selección, sin ningún código
+                                 adicional. -->
+                            {{ form.anotacion }}
                         </div>
                         {{ form.bloqueInicio.errors }}
+                        {{ form.anotacion.errors }}
 
                         <div id="resumen-vacio" class="text-muted small mb-3">
                             {% if sala_disponibilidad %}
@@ -378,64 +578,26 @@ Nueva Audiencia
                             <p class="mb-1">
                                 Hora de inicio: <strong id="resumen-hora-inicio"></strong>
                             </p>
-                            <p class="mb-0">
+                            <p class="mb-1">
                                 Hora de término: <strong id="resumen-hora-termino"></strong>
                             </p>
-                        </div>
-
-                        <!-- formnovalidate: fecha/bloqueInicio pueden seguir
-                             vacíos a propósito en este paso (es lo que las
-                             propuestas ayudan a decidir). -->
-                        <button type="submit"
-                                formaction="{% url 'proponer_fechas_audiencia' %}"
-                                formnovalidate
-                                class="btn btn-outline-primary">
-                            Solicitar propuestas
-                        </button>
-
-                    </div>
-
-                    <!-- Propuestas automáticas (GeneradorPropuestaFecha),
-                         solo si se solicitaron. -->
-                    {% if propuestas %}
-                    <div class="mt-3">
-                        {% for propuesta in propuestas %}
-                        <div class="border rounded p-3 mb-2">
-
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>Propuesta {{ forloop.counter }}</strong>
-                                {% if propuesta.fueraDePlazo %}
-                                    <span class="badge bg-warning text-dark">Fuera de plazo legal</span>
-                                {% endif %}
-                            </div>
-
-                            <p class="mb-1">
-                                {{ propuesta.fecha|date:"d/m/Y" }} ·
-                                {{ propuesta.horaInicio|time:"H:i" }} - {{ propuesta.horaTermino|time:"H:i" }} ·
-                                {{ propuesta.sala }} · {{ propuesta.cantidadBloques }} bloque(s)
+                            <p class="mb-0">
+                                <!-- Botón discreto junto a la información de la
+                                     audiencia seleccionada, no un campo de texto
+                                     permanente. abrirModalAnotacionPendiente()
+                                     lee el valor actual de "id_anotacion" (el
+                                     campo oculto de arriba) para decidir el
+                                     texto/título del modal (Agregar/Modificar). -->
+                                <button type="button"
+                                        id="boton-anotacion-pendiente"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        onclick="abrirModalAnotacionPendiente()">
+                                    📝 Agregar
+                                </button>
                             </p>
-
-                            {% for advertencia_propuesta in propuesta.advertencias %}
-                                <p class="text-warning mb-1">{{ advertencia_propuesta }}</p>
-                            {% endfor %}
-
-                            <!-- Botón type="button": no envía nada ni recarga
-                                 la página, solo completa fecha/bloqueInicio
-                                 del formulario principal mediante JavaScript.
-                                 El funcionario sigue pudiendo modificarlos
-                                 antes de guardar. -->
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-success"
-                                    data-fecha="{{ propuesta.fecha|date:'Y-m-d' }}"
-                                    data-bloque="{{ propuesta.bloqueInicio.pk }}"
-                                    onclick="usarPropuesta(this)">
-                                Usar esta propuesta
-                            </button>
-
                         </div>
-                        {% endfor %}
+
                     </div>
-                    {% endif %}
 
                 </div>
 
@@ -505,6 +667,75 @@ Nueva Audiencia
                     </button>
                     <button type="button" class="btn btn-primary" onclick="confirmarCantidadBloques()">
                         Aceptar
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ============================================= -->
+    <!--  MODAL: ¿CUÁNTOS BLOQUES DURARÁ (BÚSQUEDA      -->
+    <!--         AUTOMÁTICA)?                           -->
+    <!-- ============================================= -->
+    <!-- Se abre al presionar "Solicitar propuestas" (columna
+         izquierda, "Búsqueda automática"). Mismo patrón que el
+         modal de arriba ("¿Cuántos bloques ocupará la
+         audiencia?"): Bootstrap Modal ya cargado por el proyecto,
+         sin librerías nuevas, y ubicado como hijo directo de
+         <form> y FUERA de cualquier .card, por el mismo motivo ya
+         documentado arriba (".card:hover{transform:...}" rompe
+         position:fixed si el modal queda anidado dentro de una
+         .card).
+
+         A diferencia del otro modal, el <select> de acá NO es el
+         campo real cantidadBloques del formulario renderizado por
+         Django: no puede ser el mismo campo real renderizado dos
+         veces en la misma página -quedarían dos elementos con el
+         mismo id="id_cantidadBloques" y el mismo
+         name="cantidadBloques", HTML inválido y ambiguo para leer
+         por JavaScript-. Es un <select> auxiliar, solo
+         de interfaz, con las mismas diez opciones (1 a 10, igual
+         que AudienciaForm.cantidadBloques en audiencias/forms.py).
+         Al confirmar, confirmarBusquedaAutomatica() copia el
+         valor elegido acá al campo real "id_cantidadBloques" antes
+         de enviar el formulario: la búsqueda automática sigue
+         viajando por el mismo campo de siempre, no por uno nuevo. -->
+
+    <div class="modal fade" id="modalBusquedaAutomatica" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">¿Cuántos bloques durará la audiencia?</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <label for="id_cantidadBloquesBusquedaAutomatica">Cantidad de bloques:</label>
+                    <select id="id_cantidadBloquesBusquedaAutomatica">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="confirmarBusquedaAutomatica()">
+                        Buscar disponibilidad
                     </button>
                 </div>
 
@@ -597,6 +828,86 @@ Nueva Audiencia
 
 </form>
 
+<!-- ============================================= -->
+<!--  MODAL: AGREGAR/MODIFICAR ANOTACIÓN            -->
+<!-- ============================================= -->
+<!-- Se abre desde dos lugares distintos, que comparten este
+     mismo modal (mismo título/botón, que abrirModalAnotacion()
+     ajusta según corresponda):
+
+     1) El botón "📝 Agregar"/"📝 Modificar" de "Configuración de
+        la audiencia" (dentro de "#form-audiencia"): la audiencia
+        todavía está solo "Seleccionada", sin guardar. Al
+        confirmar, el texto se copia al campo oculto
+        "id_anotacion" de ESE formulario -no se envía nada al
+        servidor todavía; viaja recién cuando se presione
+        "Guardar audiencia"/"Confirmar programación", o se
+        descarta si el funcionario cancela/navega a otra
+        pantalla-.
+
+     2) El botón 📝 de una fila "Ocupado" en la tabla de
+        disponibilidad (audiencia YA registrada). Al confirmar,
+        el texto se envía mediante "form-anotacion-existente"
+        (más abajo, fuera de "#form-audiencia" a propósito: no
+        puede ser un <form> anidado dentro de otro <form>, HTML
+        no lo permite) hacia guardar_anotacion_audiencia
+        (audiencias/views.py), que sí guarda de inmediato en la
+        base de datos.
+
+     Va, igual que los demás modales de esta pantalla, como hijo
+     directo del <body> -renderizado aquí, fuera de cualquier
+     .card- por el mismo motivo ya documentado arriba para
+     "modalCantidadBloques" (".card:hover{transform:...}" rompe
+     position:fixed si el modal queda anidado dentro de una
+     .card). -->
+
+<div class="modal fade" id="modalAnotacion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold" id="modal-anotacion-titulo">Agregar anotación</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <textarea id="textarea-anotacion" rows="4" class="w-100"></textarea>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+                <button type="button" id="boton-guardar-anotacion" class="btn btn-primary" onclick="confirmarAnotacion()">
+                    Guardar
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Formulario auxiliar, oculto, exclusivo para guardar la
+     anotación de una audiencia YA REGISTRADA (caso 2 de arriba).
+     No tiene ningún campo visible: confirmarAnotacion() completa
+     "audiencia_id"/"anotacion" por código y envía este <form> con
+     .submit() -recarga de página completa, sin AJAX, mismo
+     criterio que el resto del proyecto-. Vive fuera de
+     "#form-audiencia" porque HTML no permite formularios
+     anidados. -->
+
+<form id="form-anotacion-existente"
+      method="post"
+      action="{% url 'guardar_anotacion_audiencia' %}"
+      class="d-none">
+
+    {% csrf_token %}
+
+    <input type="hidden" name="audiencia_id" id="id_anotacion_audiencia_id">
+    <input type="hidden" name="anotacion" id="id_anotacion_valor_existente">
+
+</form>
+
 <!-- ========================================= -->
 <!--              JAVASCRIPT                    -->
 <!-- ========================================= -->
@@ -618,6 +929,34 @@ Nueva Audiencia
     var bloqueClickeado = null;
 
     function abrirModalCantidadBloques(fila) {
+        var selectBloque = document.getElementById("id_bloqueInicio");
+
+        // Deseleccionar: si la fila clickeada es exactamente el
+        // bloque que ya está elegido como bloque de inicio (o sea,
+        // la fila que hoy se muestra como "Seleccionado" por ser el
+        // inicio de la selección vigente), un segundo clic sobre ESE
+        // MISMO bloque deshace la selección en vez de volver a abrir
+        // el modal. Se hace con el mismo mecanismo que ya usa el
+        // resto de la pantalla para fijar la selección (vaciar
+        // id_bloqueInicio + actualizarResumenSeleccion() +
+        // actualizarDisponibilidad(), igual que confirmarCantidadBloques()
+        // y usarPropuesta() más abajo), no una lógica nueva. Un clic
+        // sobre cualquier OTRA fila (disponible, o "Seleccionado" pero
+        // no la de inicio) sigue abriendo el modal exactamente como
+        // antes.
+        if (selectBloque.value && selectBloque.value === fila.dataset.bloque) {
+            selectBloque.value = "";
+            // La anotación pertenece a la audiencia que se estaba
+            // armando; si esa selección se deshace por completo,
+            // no queda ninguna audiencia a la cual asociarla, así
+            // que se descarta junto con ella (mismo campo real
+            // "id_anotacion", ver "Configuración de la audiencia").
+            document.getElementById("id_anotacion").value = "";
+            actualizarResumenSeleccion();
+            actualizarDisponibilidad();
+            return;
+        }
+
         bloqueClickeado = fila.dataset.bloque;
         document.getElementById("modal-hora-elegida").textContent = fila.dataset.hora;
 
@@ -641,11 +980,120 @@ Nueva Audiencia
         actualizarDisponibilidad();
     }
 
+    function abrirModalBusquedaAutomatica() {
+        var modal = new bootstrap.Modal(document.getElementById("modalBusquedaAutomatica"));
+        modal.show();
+    }
+
+    function confirmarBusquedaAutomatica() {
+        // Copia la cantidad elegida en el <select> auxiliar del
+        // modal al campo REAL del formulario (id_cantidadBloques),
+        // el mismo que usa la selección manual: la búsqueda
+        // automática reutiliza ese campo y el envío normal a
+        // proponer_fechas_audiencia, sin un campo ni una lógica
+        // aparte.
+        var cantidadElegida = document.getElementById("id_cantidadBloquesBusquedaAutomatica").value;
+        document.getElementById("id_cantidadBloques").value = cantidadElegida;
+
+        var instanciaModal = bootstrap.Modal.getInstance(document.getElementById("modalBusquedaAutomatica"));
+        if (instanciaModal) {
+            instanciaModal.hide();
+        }
+
+        // "btn-solicitar-propuestas" es el botón real (oculto),
+        // con el mismo formaction/formnovalidate de siempre: mismo
+        // mecanismo que ya usa actualizarDisponibilidad() con
+        // "btn-ver-disponibilidad".
+        document.getElementById("btn-solicitar-propuestas").click();
+    }
+
     function usarPropuesta(boton) {
         document.getElementById("id_fecha").value = boton.dataset.fecha;
         document.getElementById("id_bloqueInicio").value = boton.dataset.bloque;
         actualizarResumenSeleccion();
         actualizarDisponibilidad();
+    }
+
+    // =========================================
+    //   ANOTACIÓN
+    // =========================================
+    // Recuerda, mientras el modal de anotación está abierto, si se
+    // abrió para la audiencia todavía "Seleccionada" (esModoExistente
+    // = false) o para una audiencia YA registrada (esModoExistente =
+    // true, con anotacionAudienciaIdActual = su pk): confirmarAnotacion()
+    // usa esta bandera para decidir a cuál de los dos mecanismos
+    // guardar el texto ingresado (ver comentario del modal más arriba).
+    var anotacionEsModoExistente = false;
+    var anotacionAudienciaIdActual = null;
+
+    function abrirModalAnotacion(esModoExistente, audienciaId, textoActual) {
+        anotacionEsModoExistente = esModoExistente;
+        anotacionAudienciaIdActual = audienciaId;
+
+        document.getElementById("textarea-anotacion").value = textoActual || "";
+
+        var tieneAnotacion = !!(textoActual && textoActual.trim().length > 0);
+        document.getElementById("modal-anotacion-titulo").textContent =
+            tieneAnotacion ? "Modificar anotación" : "Agregar anotación";
+        document.getElementById("boton-guardar-anotacion").textContent =
+            tieneAnotacion ? "Guardar cambios" : "Guardar";
+
+        var modal = new bootstrap.Modal(document.getElementById("modalAnotacion"));
+        modal.show();
+    }
+
+    function abrirModalAnotacionPendiente() {
+        // Audiencia todavía no creada (estado "Seleccionado"): el
+        // texto actual, si ya se había ingresado uno, vive en el
+        // campo oculto "id_anotacion" del formulario principal.
+        var valorActual = document.getElementById("id_anotacion").value;
+        abrirModalAnotacion(false, null, valorActual);
+    }
+
+    function abrirModalAnotacionExistente(audienciaId, textoActual) {
+        // Audiencia YA registrada (fila "Ocupado" de la tabla).
+        abrirModalAnotacion(true, audienciaId, textoActual);
+    }
+
+    function confirmarAnotacion() {
+        var texto = document.getElementById("textarea-anotacion").value;
+
+        if (anotacionEsModoExistente) {
+            // Se guarda de inmediato en la base de datos, mediante el
+            // formulario auxiliar oculto "form-anotacion-existente"
+            // (fuera de "#form-audiencia", ver su comentario más
+            // arriba): recarga de página completa hacia
+            // guardar_anotacion_audiencia, sin AJAX.
+            document.getElementById("id_anotacion_audiencia_id").value = anotacionAudienciaIdActual;
+            document.getElementById("id_anotacion_valor_existente").value = texto;
+            document.getElementById("form-anotacion-existente").submit();
+            return;
+        }
+
+        // Audiencia todavía no creada: se guarda solo en memoria,
+        // dentro del propio "#form-audiencia" (campo oculto real
+        // "id_anotacion"), hasta que se presione "Guardar audiencia"/
+        // "Confirmar programación". No se envía nada al servidor
+        // acá -no hay recarga de página para este caso-.
+        document.getElementById("id_anotacion").value = texto;
+        actualizarBotonAnotacionPendiente();
+
+        var instanciaModal = bootstrap.Modal.getInstance(document.getElementById("modalAnotacion"));
+        if (instanciaModal) {
+            instanciaModal.hide();
+        }
+    }
+
+    function actualizarBotonAnotacionPendiente() {
+        // Mantiene el texto del botón "📝 Agregar"/"📝 Modificar" de
+        // "Configuración de la audiencia" sincronizado con el campo
+        // oculto "id_anotacion", sin volver a consultar el servidor.
+        var boton = document.getElementById("boton-anotacion-pendiente");
+        var valorActual = document.getElementById("id_anotacion").value;
+
+        boton.textContent = (valorActual && valorActual.trim().length > 0)
+            ? "📝 Modificar"
+            : "📝 Agregar";
     }
 
     function obtenerTodosLosBloques() {
@@ -724,6 +1172,53 @@ Nueva Audiencia
 
         resumenVacio.classList.add("d-none");
         resumenSeleccion.classList.remove("d-none");
+
+        // Mantiene el botón "📝 Agregar"/"📝 Modificar" sincronizado
+        // cada vez que hay una selección vigente (incluida la carga
+        // inicial de la página, si ya venía una anotación desde un
+        // envío anterior del mismo formulario).
+        actualizarBotonAnotacionPendiente();
+    }
+
+    function cambiarDiaConsultado(delta) {
+        // Suma/resta "delta" días (siempre 1 o -1, desde las
+        // flechas) al MISMO campo real "id_fecha" que usa
+        // "Selección manual de fecha": no existe un segundo valor
+        // de fecha en la pantalla, por lo que ambos lugares quedan
+        // sincronizados automáticamente, sin código adicional.
+        var inputFecha = document.getElementById("id_fecha");
+
+        if (!inputFecha.value) {
+            return;
+        }
+
+        // input[type="date"] siempre entrega/acepta el formato ISO
+        // "AAAA-MM-DD". Se arma la fecha con año/mes/día locales
+        // (no con "new Date('AAAA-MM-DD')", que Python... que el
+        // navegador interpretaría como UTC y podría desfasar el día
+        // según la zona horaria) para que sumar/restar un día con
+        // setDate() maneje correctamente fin de mes y años
+        // bisiestos.
+        var partes = inputFecha.value.split("-");
+        var fecha = new Date(
+            parseInt(partes[0], 10),
+            parseInt(partes[1], 10) - 1,
+            parseInt(partes[2], 10)
+        );
+        fecha.setDate(fecha.getDate() + delta);
+
+        var anio = fecha.getFullYear();
+        var mes = String(fecha.getMonth() + 1).padStart(2, "0");
+        var dia = String(fecha.getDate()).padStart(2, "0");
+        inputFecha.value = anio + "-" + mes + "-" + dia;
+
+        // Reutiliza el mismo mecanismo de consulta que ya usa
+        // cualquier otro cambio en esta pantalla (elegir bloque,
+        // cantidad, propuesta): reenvía el <form> completo hacia
+        // ver_disponibilidad_audiencia, sin AJAX ni un endpoint
+        // nuevo. Sala, causa, tipo de audiencia y cantidad de
+        // bloques viajan intactos porque es el mismo formulario.
+        actualizarDisponibilidad();
     }
 
     function actualizarDisponibilidad() {

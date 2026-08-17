@@ -12,6 +12,11 @@ estado del catálogo de salas del tribunal.
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
+# Decorador que restringe el acceso a usuarios con rol
+# Administrador: Salas es un módulo de Configuración (ver
+# usuarios/decorators.py).
+from usuarios.decorators import solo_administrador
+
 # Decorador que restringe el acceso únicamente a solicitudes POST.
 # Se usa en cambiar_estado_sala porque esa vista modifica datos:
 # igual que ocurrió con el cierre de sesión, una acción que cambia
@@ -39,13 +44,15 @@ from .models import Sala
 # =====================================================
 
 @login_required
+@solo_administrador
 def lista_salas(request):
     """
     Muestra el listado de salas registradas
     en el sistema.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista:
+    Salas es un módulo de Configuración.
     """
 
     # -------------------------------------------------
@@ -74,6 +81,7 @@ def lista_salas(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 def crear_sala(request):
     """
     Permite registrar una nueva sala del sistema.
@@ -83,8 +91,8 @@ def crear_sala(request):
     notifica el éxito mediante el framework de mensajes y
     redirige al listado de salas.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista.
     """
 
     if request.method == "POST":
@@ -129,6 +137,7 @@ def crear_sala(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 @require_POST
 def cambiar_estado_sala(request, pk):
     """
@@ -145,8 +154,9 @@ def cambiar_estado_sala(request, pk):
     Si la sala no existe, responde con un error 404
     (get_object_or_404).
 
-    Solo los usuarios autenticados pueden acceder a esta
-    vista, y solo mediante una solicitud POST.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista, y
+    solo mediante una solicitud POST.
     """
 
     # -------------------------------------------------
@@ -182,6 +192,7 @@ def cambiar_estado_sala(request, pk):
 # =====================================================
 
 @login_required
+@solo_administrador
 def editar_sala(request, pk):
     """
     Permite modificar una sala existente del sistema.
@@ -195,8 +206,8 @@ def editar_sala(request, pk):
     Si la sala no existe, responde con un error 404
     (get_object_or_404).
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista.
     """
 
     # -------------------------------------------------

@@ -64,8 +64,14 @@ Reglas de Agendamiento
                 <tr>
                     <td>{{ regla.competencia }}</td>
                     <td>{{ regla.tipoAudiencia }}</td>
-                    <td>{{ regla.plazoMinimo }}</td>
-                    <td>{{ regla.plazoMaximo }}</td>
+                    <!-- default_if_none (no "default"): un plazo en 0
+                         es un valor válido ("sin anticipación
+                         mínima"), no debe confundirse con un plazo
+                         vacío/no configurado -"default" trataría el
+                         0 como falsy y lo reemplazaría igual por
+                         "—", lo cual sería incorrecto-. -->
+                    <td>{{ regla.plazoMinimo|default_if_none:"—" }}</td>
+                    <td>{{ regla.plazoMaximo|default_if_none:"—" }}</td>
                     <td>{{ regla.get_unidadPlazo_display }}</td>
                     <td>
                         {% if regla.activa %}

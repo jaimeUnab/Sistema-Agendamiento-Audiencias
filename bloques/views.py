@@ -13,6 +13,11 @@ bloques horarios oficiales del tribunal.
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
+# Decorador que restringe el acceso a usuarios con rol
+# Administrador: Bloques Horarios es un módulo de Configuración
+# (ver usuarios/decorators.py).
+from usuarios.decorators import solo_administrador
+
 # Decorador que restringe el acceso únicamente a solicitudes POST.
 # Se usa en cambiar_agendamiento_automatico porque esa vista
 # modifica datos: igual que con el cierre de sesión y con
@@ -39,13 +44,15 @@ from .models import BloqueHorario
 # =====================================================
 
 @login_required
+@solo_administrador
 def lista_bloques(request):
     """
     Muestra el listado de bloques horarios oficiales
     registrados en el sistema.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista:
+    Bloques Horarios es un módulo de Configuración.
     """
 
     # -------------------------------------------------
@@ -75,6 +82,7 @@ def lista_bloques(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 def crear_bloque(request):
     """
     Permite registrar un nuevo bloque horario del sistema.
@@ -84,8 +92,8 @@ def crear_bloque(request):
     notifica el éxito mediante el framework de mensajes y
     redirige al listado de bloques.
 
-    Solo los usuarios autenticados pueden acceder
-    a esta vista.
+    Solo los usuarios autenticados con rol Administrador (o
+    superusuarios de Django) pueden acceder a esta vista.
     """
 
     if request.method == "POST":
@@ -130,6 +138,7 @@ def crear_bloque(request):
 # =====================================================
 
 @login_required
+@solo_administrador
 @require_POST
 def cambiar_agendamiento_automatico(request, pk):
     """
@@ -193,6 +202,7 @@ def cambiar_agendamiento_automatico(request, pk):
 # =====================================================
 
 @login_required
+@solo_administrador
 def editar_bloque(request, pk):
     """
     Permite modificar un bloque horario existente del
