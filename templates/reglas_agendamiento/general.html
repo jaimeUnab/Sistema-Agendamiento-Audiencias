@@ -37,12 +37,17 @@ Reglas de Agendamiento
 
         <hr>
 
-        <!-- Se utiliza exclusivamente {{ form }}: ConfiguracionAgendamientoForm
-             ya define sus 4 campos (Hora de inicio de la jornada, Hora de
-             término de la jornada, Duración del bloque, Horizonte de
-             búsqueda) y sus validaciones; aquí solo se reorganiza en filas
-             usando el grid de Bootstrap 5, para acercarse a la
-             distribución del mockup, sin declarar ningún campo nuevo. -->
+        <!-- ConfiguracionAgendamientoForm ya define sus 4 campos (Hora de
+             inicio de la jornada, Hora de término de la jornada, Duración
+             del bloque, Horizonte de búsqueda), sus validaciones y la
+             clase Bootstrap de cada widget (form-control/form-select, ver
+             reglas_agendamiento/forms.py); aquí solo se reorganiza en
+             filas usando el grid de Bootstrap 5, para acercarse a la
+             distribución del mockup, sin declarar ningún campo nuevo.
+             Las etiquetas se escriben explícitas con class="form-label"
+             (en vez de {{ field.label_tag }}, que no permite pasarle una
+             clase desde el template) -mismo criterio visual que el resto
+             de los formularios del sistema-. -->
         <form method="post">
 
             {% csrf_token %}
@@ -52,19 +57,25 @@ Reglas de Agendamiento
             <div class="row g-3">
 
                 <div class="col-md-4">
-                    {{ form.horaInicioJornada.label_tag }}
+                    <label for="{{ form.horaInicioJornada.id_for_label }}" class="form-label">
+                        {{ form.horaInicioJornada.label }}
+                    </label>
                     {{ form.horaInicioJornada }}
                     {{ form.horaInicioJornada.errors }}
                 </div>
 
                 <div class="col-md-4">
-                    {{ form.horaTerminoJornada.label_tag }}
+                    <label for="{{ form.horaTerminoJornada.id_for_label }}" class="form-label">
+                        {{ form.horaTerminoJornada.label }}
+                    </label>
                     {{ form.horaTerminoJornada }}
                     {{ form.horaTerminoJornada.errors }}
                 </div>
 
                 <div class="col-md-4">
-                    {{ form.duracionBloque.label_tag }}
+                    <label for="{{ form.duracionBloque.id_for_label }}" class="form-label">
+                        {{ form.duracionBloque.label }}
+                    </label>
                     {{ form.duracionBloque }}
                     {{ form.duracionBloque.errors }}
                 </div>
@@ -74,7 +85,9 @@ Reglas de Agendamiento
             <div class="row g-3 mt-1">
 
                 <div class="col-md-4">
-                    {{ form.horizonteBusquedaDias.label_tag }}
+                    <label for="{{ form.horizonteBusquedaDias.id_for_label }}" class="form-label">
+                        {{ form.horizonteBusquedaDias.label }}
+                    </label>
                     {{ form.horizonteBusquedaDias }}
                     {{ form.horizonteBusquedaDias.errors }}
                 </div>

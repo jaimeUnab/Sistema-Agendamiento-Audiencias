@@ -87,9 +87,26 @@ class UsuarioForm(forms.ModelForm):
         nuevo (instance.pk aún None) siguen siendo
         obligatorios, sin cambios respecto al comportamiento
         original.
+
+        También agrega la clase Bootstrap correspondiente a cada
+        campo (form-control / form-select / form-check-input)
+        según el tipo de widget -incluye "nombre"/"email" (texto),
+        "rol" (select), "is_active" (checkbox) y "password1"/
+        "password2" (declarados arriba con PasswordInput)-.
+        Exclusivamente presentación: no cambia validación ni
+        comportamiento.
         """
 
         super().__init__(*args, **kwargs)
+
+        for campo in self.fields.values():
+            widget = campo.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")
 
         if self.instance.pk:
             self.fields["password1"].required = False

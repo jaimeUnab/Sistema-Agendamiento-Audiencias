@@ -74,9 +74,27 @@ class BloqueHorarioForm(forms.ModelForm):
         inicial (el que ya tiene la instancia), sin importar
         que alguien manipule el HTML o el request. "readonly"
         es solo una pista visual y no ofrece esa protección.
+
+        También agrega la clase Bootstrap correspondiente a cada
+        campo (form-control / form-select / form-check-input)
+        según el tipo de widget -exclusivamente presentación, no
+        cambia validación ni comportamiento-, incluidos los tres
+        campos que quedan disabled más abajo: Bootstrap ya sabe
+        atenuar visualmente un ".form-control:disabled" por su
+        cuenta. setdefault no pisa "type": "time" ya declarado en
+        Meta.widgets.
         """
 
         super().__init__(*args, **kwargs)
+
+        for campo in self.fields.values():
+            widget = campo.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")
 
         if self.instance.pk:
             self.fields["orden"].disabled = True

@@ -121,6 +121,28 @@ class ConfiguracionAgendamientoForm(forms.ModelForm):
             "horaTerminoJornada": forms.TimeInput(attrs={"type": "time"}),
         }
 
+    def __init__(self, *args, **kwargs):
+        """
+        Agrega la clase Bootstrap correspondiente a cada campo
+        (form-control / form-select) según el tipo de widget -
+        "duracionBloque" es un Select (TypedChoiceField declarado
+        arriba), el resto son inputs de hora/número-. Exclusivamente
+        presentación: no cambia validación ni comportamiento.
+        setdefault no pisa "type": "time" ya declarado en
+        Meta.widgets.
+        """
+
+        super().__init__(*args, **kwargs)
+
+        for campo in self.fields.values():
+            widget = campo.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")
+
 
 # =====================================================
 # FORMULARIO: PLAZO LEGAL
@@ -179,6 +201,21 @@ class ReglaAgendamientoForm(forms.ModelForm):
         self.fields["competencia"].queryset = Competencia.objects.all()
         self.fields["tipoAudiencia"].queryset = TipoAudiencia.objects.all()
 
+        # Clase Bootstrap correspondiente a cada campo (form-control /
+        # form-select / form-check-input) según el tipo de widget -
+        # "competencia"/"tipoAudiencia"/"unidadPlazo" son Select,
+        # "activa" es un checkbox, el resto son inputs numéricos-.
+        # Exclusivamente presentación: no cambia validación ni
+        # comportamiento.
+        for campo in self.fields.values():
+            widget = campo.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")
+
 
 # =====================================================
 # FORMULARIO: DÍA NO DISPONIBLE
@@ -221,3 +258,25 @@ class DiaNoDisponibleForm(forms.ModelForm):
             # criterio que AudienciaForm usa para "fecha".
             "fecha": forms.DateInput(attrs={"type": "date"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        """
+        Agrega la clase Bootstrap correspondiente a cada campo
+        (form-control / form-select / form-check-input) según el
+        tipo de widget -"tipo" es un Select, "activo" es un
+        checkbox, "fecha"/"motivo" son inputs de texto-.
+        Exclusivamente presentación: no cambia validación ni
+        comportamiento. setdefault no pisa "type": "date" ya
+        declarado en Meta.widgets.
+        """
+
+        super().__init__(*args, **kwargs)
+
+        for campo in self.fields.values():
+            widget = campo.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")

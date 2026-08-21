@@ -34,16 +34,45 @@ Reglas de Agendamiento
 
                 <hr>
 
-                <!-- Se utiliza exclusivamente {{ form }}: ReglaAgendamientoForm ya
-                     define sus campos y las validaciones del modelo -incluida la
-                     UniqueConstraint(competencia, tipoAudiencia)-, por lo que aquí
-                     no se vuelve a declarar ningún campo manualmente. -->
+                <!-- ReglaAgendamientoForm ya define sus campos, las
+                     validaciones del modelo -incluida la
+                     UniqueConstraint(competencia, tipoAudiencia)- y la
+                     clase Bootstrap de cada widget (form-control/
+                     form-select/form-check-input, ver
+                     reglas_agendamiento/forms.py); este template solo
+                     recorre los campos uno por uno -en vez de {{ form }}
+                     crudo- para envolver cada uno con "mb-3"/
+                     "form-label" (o "form-check"/"form-check-label" si
+                     es una casilla), mismo criterio visual que
+                     templates/audiencias/formulario.html. -->
 
                 <form method="post">
 
                     {% csrf_token %}
 
-                    {{ form }}
+                    {{ form.non_field_errors }}
+
+                    {% for field in form %}
+
+                        {% if field.field.widget.input_type == "checkbox" %}
+                        <div class="mb-3 form-check">
+                            {{ field }}
+                            <label for="{{ field.id_for_label }}" class="form-check-label">
+                                {{ field.label }}
+                            </label>
+                            {{ field.errors }}
+                        </div>
+                        {% else %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">
+                                {{ field.label }}
+                            </label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                        {% endif %}
+
+                    {% endfor %}
 
                     <div class="mt-4">
 
