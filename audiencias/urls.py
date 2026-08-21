@@ -41,4 +41,11 @@ urlpatterns = [
         name="dejar_sin_efecto_audiencia",
     ),
 
+    # Consulta de trazabilidad de una audiencia, de solo lectura.
+    path(
+        "<int:pk>/trazabilidad/",
+        views.ver_trazabilidad_audiencia,
+        name="ver_trazabilidad_audiencia",
+    ),
+
 ]

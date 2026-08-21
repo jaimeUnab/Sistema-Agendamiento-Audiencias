@@ -923,3 +923,64 @@ def dejar_sin_efecto_audiencia(request):
     return redirect(
         f"{reverse('agenda_diaria')}?fecha={audiencia.fecha.isoformat()}"
     )
+
+
+# =====================================================
+# TRAZABILIDAD (audiencia ya registrada, solo lectura)
+# =====================================================
+
+@login_required
+def ver_trazabilidad_audiencia(request, pk):
+    """
+    Muestra los registros de RegistroTrazabilidad asociados a una
+    Audiencia, del más antiguo al más reciente. Es una vista de
+    solo lectura: no crea, modifica ni elimina ningún
+    RegistroTrazabilidad (esos ya quedaron creados por
+    ServicioTrazabilidad al momento de cada operación real -
+    creación, modificación, baja-; esta vista únicamente consulta).
+
+    Se accede desde el botón "Ver trazabilidad" de una fila de la
+    agenda diaria (ver templates/audiencias/agenda.html). La
+    audiencia se identifica por su "pk" en la propia URL (a
+    diferencia de guardar_anotacion_audiencia/
+    dejar_sin_efecto_audiencia, que la reciben por POST: esta vista
+    es de solo consulta, por GET, así que puede -y conviene- que la
+    URL identifique directamente qué audiencia se está consultando).
+
+    Los registros se obtienen a través de
+    audiencia.registros_trazabilidad (related_name definido en
+    RegistroTrazabilidad.audiencia), filtrando así, de forma
+    automática, únicamente los que pertenecen a esta Audiencia. Se
+    ordenan explícitamente por "fechaHora" ascendente (del más
+    antiguo al más reciente): el Meta.ordering por defecto del
+    modelo es descendente (ver audiencias/models.py), pensado para
+    un historial general; acá se pide el orden cronológico inverso,
+    así que se especifica explícitamente en la consulta en vez de
+    apoyarse en ese valor por defecto.
+
+    select_related("usuario") evita una consulta adicional por cada
+    registro al mostrar su usuario responsable en el template.
+
+    Si la audiencia no existe, responde con un error 404
+    (get_object_or_404, mismo criterio que el resto de las vistas
+    de esta app que reciben un identificador de Audiencia).
+
+    Solo los usuarios autenticados pueden acceder a esta vista
+    (mismo criterio que agenda_diaria, guardar_anotacion_audiencia y
+    dejar_sin_efecto_audiencia: sin restricción adicional de rol).
+    """
+
+    audiencia = get_object_or_404(Audiencia, pk=pk)
+
+    registros = audiencia.registros_trazabilidad.select_related(
+        "usuario"
+    ).order_by("fechaHora")
+
+    return render(
+        request,
+        "audiencias/trazabilidad.html",
+        {
+            "audiencia": audiencia,
+            "registros": registros,
+        },
+    )

@@ -812,3 +812,204 @@ class GuardarAnotacionAudienciaTrazabilidadIntegrationTests(TestCase):
         self.assertFalse(
             RegistroTrazabilidad.objects.filter(audiencia=self.audiencia).exists()
         )
+
+
+# =====================================================
+# CONSULTA DE TRAZABILIDAD (audiencia ya registrada)
+# =====================================================
+
+class VerTrazabilidadAudienciaIntegrationTests(TestCase):
+    """
+    Prueba de integración de ver_trazabilidad_audiencia: verifica
+    que la pantalla "Ver trazabilidad" (accesible desde la agenda
+    diaria) muestre EXCLUSIVAMENTE los campos que ya existen en
+    RegistroTrazabilidad (fechaHora, usuario, accion,
+    valoresAnteriores, valoresNuevos), filtrados por la audiencia
+    correcta y ordenados del más antiguo al más reciente.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="usuario_trazabilidad_integracion",
+            email="trazabilidad_integracion@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Trazabilidad Integración",
+        )
+        self.competencia = Competencia.objects.create(
+            nombre="Competencia Trazabilidad Integración"
+        )
+        self.tipo_audiencia = TipoAudiencia.objects.create(
+            nombre="Tipo Trazabilidad Integración", activo=True
+        )
+        self.sala = Sala.objects.create(
+            nombre="Sala Trazabilidad Integración", activa=True
+        )
+        self.causa = Causa.objects.create(
+            competencia=self.competencia,
+            rit="7004-2027",
+            ruc="2700070040-4",
+            caratulado="Causa Trazabilidad Integración",
+        )
+        self.bloque = BloqueHorario.objects.create(
+            orden=9731,
+            horaInicio=datetime.time(9, 0),
+            horaTermino=datetime.time(9, 30),
+        )
+        self.fecha = datetime.date(2027, 5, 20)
+
+        self.audiencia = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=self.bloque,
+            cantidadBloques=1,
+            fecha=self.fecha,
+            horaInicio=self.bloque.horaInicio,
+            horaTermino=self.bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+        )
+
+        # Otra audiencia, con su propio registro de trazabilidad:
+        # NO debe aparecer al consultar la primera.
+        self.otra_audiencia = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=BloqueHorario.objects.create(
+                orden=9732,
+                horaInicio=datetime.time(9, 30),
+                horaTermino=datetime.time(10, 0),
+            ),
+            cantidadBloques=1,
+            fecha=self.fecha,
+            horaInicio=datetime.time(9, 30),
+            horaTermino=datetime.time(10, 0),
+            usuarioCreacion=self.usuario,
+        )
+        RegistroTrazabilidad.objects.create(
+            audiencia=self.otra_audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.CREACION,
+            valoresAnteriores=None,
+            valoresNuevos={"id": self.otra_audiencia.id},
+        )
+
+        self.client.login(username=self.usuario.email, password="ClaveSegura123")
+
+    def test_requiere_login(self):
+        self.client.logout()
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse("login"), respuesta.url)
+
+    def test_sin_registros_muestra_mensaje(self):
+        # self.audiencia no tiene ningún RegistroTrazabilidad
+        # asociado (el único creado en setUp pertenece a
+        # self.otra_audiencia).
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(list(respuesta.context["registros"]), [])
+        self.assertContains(
+            respuesta,
+            "No existen registros de trazabilidad para esta audiencia.",
+        )
+
+    def test_muestra_unicamente_los_registros_de_esa_audiencia(self):
+        RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.CREACION,
+            valoresAnteriores=None,
+            valoresNuevos={"id": self.audiencia.id},
+        )
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        registros = respuesta.context["registros"]
+        self.assertEqual(len(registros), 1)
+        self.assertEqual(registros[0].audiencia_id, self.audiencia.pk)
+
+    def test_registros_ordenados_del_mas_antiguo_al_mas_reciente(self):
+        primero = RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.CREACION,
+            valoresAnteriores=None,
+            valoresNuevos={"estado": "PROGRAMADA"},
+        )
+        segundo = RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.MODIFICACION,
+            valoresAnteriores={"anotacion": ""},
+            valoresNuevos={"anotacion": "Texto nuevo"},
+        )
+
+        # auto_now_add ya fijó fechaHora al crear cada registro;
+        # se fuerza un orden cronológico inequívoco con .update()
+        # -que no vuelve a disparar auto_now_add, a diferencia de
+        # .save()- para que la prueba no dependa de la resolución
+        # del reloj entre dos create() consecutivos.
+        RegistroTrazabilidad.objects.filter(pk=primero.pk).update(
+            fechaHora=datetime.datetime(2027, 5, 20, 9, 0, tzinfo=datetime.timezone.utc)
+        )
+        RegistroTrazabilidad.objects.filter(pk=segundo.pk).update(
+            fechaHora=datetime.datetime(2027, 5, 20, 10, 0, tzinfo=datetime.timezone.utc)
+        )
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        registros = list(respuesta.context["registros"])
+        self.assertEqual([r.pk for r in registros], [primero.pk, segundo.pk])
+
+    def test_muestra_exclusivamente_los_campos_existentes_del_modelo(self):
+        RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.MODIFICACION,
+            valoresAnteriores={"anotacion": "Texto anterior"},
+            valoresNuevos={"anotacion": "Texto nuevo"},
+        )
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        # accion (get_accion_display), usuario, y el contenido real
+        # de valoresAnteriores/valoresNuevos -tal cual están
+        # guardados, sin ningún campo inventado-.
+        self.assertContains(respuesta, "Modificación")
+        self.assertContains(respuesta, str(self.usuario))
+        self.assertContains(respuesta, "Texto anterior")
+        self.assertContains(respuesta, "Texto nuevo")
+
+    def test_enlace_ver_trazabilidad_aparece_en_la_agenda_diaria(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}"
+        )
+
+        self.assertContains(
+            respuesta,
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk]),
+        )
+
+    def test_volver_a_la_agenda_enlaza_a_la_fecha_de_la_audiencia(self):
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        self.assertContains(
+            respuesta,
+            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}",
+        )

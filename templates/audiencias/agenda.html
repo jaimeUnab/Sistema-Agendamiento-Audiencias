@@ -99,6 +99,17 @@ Agenda diaria
                         <td>{{ audiencia.cantidadBloques }}</td>
                         <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
                         <td>
+                            <!-- Ver trazabilidad: enlace GET de solo
+                                 lectura (no un botón que abre un modal
+                                 con POST, como "Dejar sin efecto"), ya
+                                 que ver_trazabilidad_audiencia no
+                                 modifica nada -identifica la audiencia
+                                 directamente por su pk en la URL. -->
+                            <a href="{% url 'ver_trazabilidad_audiencia' audiencia.pk %}"
+                               class="btn btn-sm btn-outline-secondary">
+                                Ver trazabilidad
+                            </a>
+
                             <!-- Todas las filas de esta tabla ya son
                                  PROGRAMADA (agenda_diaria filtra por ese
                                  estado): no hace falta una condición

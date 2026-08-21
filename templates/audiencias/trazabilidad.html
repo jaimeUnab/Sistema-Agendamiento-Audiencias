@@ -1,0 +1,120 @@
+{% extends 'base_dashboard.html' %}
+<!-- Reutiliza la misma estructura principal del sistema (menú lateral
+     y barra superior), mismo criterio que templates/audiencias/agenda.html. -->
+
+{% block title %}
+Trazabilidad de audiencia
+{% endblock %}
+
+{% block page_title %}
+Trazabilidad de audiencia
+{% endblock %}
+
+{% block content %}
+
+<!-- ========================================= -->
+<!--   DATOS DE LA AUDIENCIA CONSULTADA         -->
+<!-- ========================================= -->
+<!-- Encabezado de contexto (a qué audiencia pertenecen los
+     registros de abajo), tomado directamente de la Audiencia real
+     -no de RegistroTrazabilidad-: RIT y carátula ya se muestran así
+     en el resto de la app (agenda diaria, disponibilidad). -->
+
+<h5 class="mb-4">
+    RIT {{ audiencia.causa.rit }} — {{ audiencia.causa.caratulado }}
+</h5>
+
+<!-- ========================================= -->
+<!--   REGISTROS DE TRAZABILIDAD                -->
+<!-- ========================================= -->
+<!-- Muestra EXCLUSIVAMENTE los campos que ya existen en
+     RegistroTrazabilidad (audiencias/models.py): fechaHora, usuario,
+     accion, valoresAnteriores, valoresNuevos. No se agrega ningún
+     campo nuevo ni se calcula ninguna diferencia entre ambos JSON:
+     cada uno se muestra tal como fue guardado, clave por clave. -->
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <h6 class="fw-bold">Historial de trazabilidad</h6>
+
+        <hr>
+
+        {% if registros %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Fecha y hora</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Valores anteriores</th>
+                        <th>Valores nuevos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- order_by("fechaHora") ya aplicado en la vista
+                         (ver_trazabilidad_audiencia): del más antiguo
+                         al más reciente. -->
+                    {% for registro in registros %}
+                    <tr>
+                        <td>{{ registro.fechaHora|date:"d/m/Y H:i" }}</td>
+                        <td>{{ registro.usuario }}</td>
+                        <td>{{ registro.get_accion_display }}</td>
+                        <td>
+                            {% if registro.valoresAnteriores %}
+                                <ul class="mb-0 ps-3 small">
+                                    {% for clave, valor in registro.valoresAnteriores.items %}
+                                    <li>{{ clave }}: {{ valor }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if registro.valoresNuevos %}
+                                <ul class="mb-0 ps-3 small">
+                                    {% for clave, valor in registro.valoresNuevos.items %}
+                                    <li>{{ clave }}: {{ valor }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Sin registros: mensaje explícito, tal como se pidió,
+             en vez de mostrar una tabla vacía sin explicación. -->
+        <p class="text-muted mb-0">
+            No existen registros de trazabilidad para esta audiencia.
+        </p>
+        {% endif %}
+
+    </div>
+
+</div>
+
+<!-- ========================================= -->
+<!--   VOLVER                                   -->
+<!-- ========================================= -->
+<!-- Vuelve a la agenda diaria, en la fecha real de ESTA audiencia
+     (audiencia.fecha): mismo criterio de redirección que ya usan
+     guardar_anotacion_audiencia/dejar_sin_efecto_audiencia en
+     audiencias/views.py, para que el funcionario vea de inmediato
+     la fila de la que partió. -->
+
+<div class="mt-3">
+    <a href="{% url 'agenda_diaria' %}?fecha={{ audiencia.fecha|date:'Y-m-d' }}"
+       class="btn btn-secondary">
+        Volver a la agenda
+    </a>
+</div>
+
+{% endblock %}
