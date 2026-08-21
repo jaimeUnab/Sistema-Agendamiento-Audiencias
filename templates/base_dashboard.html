@@ -219,17 +219,17 @@
             {% if request.user.is_superuser or request.user.rol == 'ADMINISTRADOR' %}
 
             <a href="#menuConfiguracion"
-               class="menu-item {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}active{% endif %}"
+               class="menu-item {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path or '/causas/' in request.path %}active{% endif %}"
                data-bs-toggle="collapse"
                role="button"
-               aria-expanded="{% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}true{% else %}false{% endif %}"
+               aria-expanded="{% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path or '/causas/' in request.path %}true{% else %}false{% endif %}"
                aria-controls="menuConfiguracion">
 
                 <span>⚙️ Configuración</span> <i class="bi bi-chevron-down"></i>
 
             </a>
 
-            <div class="collapse {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path %}show{% endif %}"
+            <div class="collapse {% if '/usuarios/' in request.path or '/competencias/' in request.path or '/tipos-audiencia/' in request.path or '/salas/' in request.path or '/bloques/' in request.path or '/reglas-agendamiento/' in request.path or '/causas/' in request.path %}show{% endif %}"
                  id="menuConfiguracion">
 
                 <div class="d-flex flex-column" style="gap:4px;">
@@ -300,6 +300,22 @@
                         <i class="bi bi-clipboard-check"></i>
 
                         <span>Reglas de Agendamiento</span>
+
+                    </a>
+
+
+                    <!-- Causas -->
+                    <!-- Enlaza al listado (lista_causas), no directamente
+                         a la importación: mismo criterio que "Reglas de
+                         Agendamiento" apunta a su pestaña principal, y
+                         desde el listado ya hay un botón "Importar desde
+                         Excel" (ver templates/causas/lista.html). -->
+
+                    <a href="{% url 'lista_causas' %}" class="menu-item {% if '/causas/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-briefcase"></i>
+
+                        <span>Causas</span>
 
                     </a>
 

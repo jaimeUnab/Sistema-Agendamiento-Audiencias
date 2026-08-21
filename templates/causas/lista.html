@@ -1,0 +1,92 @@
+{% extends 'base_dashboard.html' %}
+<!-- Hereda la estructura principal del sistema (menú lateral y barra
+     superior), mismo criterio que templates/competencias/lista.html. -->
+
+{% block title %}
+Causas
+{% endblock %}
+<!-- Título que aparecerá en la pestaña del navegador -->
+
+{% block page_title %}
+Causas
+{% endblock %}
+<!-- Título que se muestra en la barra superior de la página -->
+
+{% block content %}
+<!-- Aquí comienza el contenido propio de esta página -->
+
+<div class="row">
+
+    <div class="col">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+
+                    <h4 class="mb-0">Listado de causas</h4>
+
+                    <!-- Único punto de entrada a la importación desde
+                         esta pantalla: no hay alta manual de una
+                         causa individual en este alcance (sin CRUD
+                         completo, según lo definido). -->
+                    <a href="{% url 'importar_causas' %}" class="btn btn-primary">
+                        Importar desde Excel
+                    </a>
+
+                </div>
+
+                <hr>
+
+                <!-- Catálogo de solo lectura: muestra RIT, RUC,
+                     Carátula y Competencia, sin botones de edición
+                     ni eliminación (no hay CRUD completo de causas
+                     en este alcance). -->
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>RIT</th>
+                                <th>RUC</th>
+                                <th>Carátula</th>
+                                <th>Competencia</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for causa in causas %}
+                            <tr>
+                                <td>{{ causa.rit }}</td>
+                                <td>{{ causa.ruc }}</td>
+                                <td>{{ causa.caratulado }}</td>
+                                <td>{{ causa.competencia.nombre }}</td>
+                            </tr>
+                            {% empty %}
+                            <!-- Mensaje mostrado cuando no existen causas registradas -->
+                            <tr>
+                                <td colspan="4" class="text-center">
+                                    No existen causas registradas. Usa
+                                    "Importar desde Excel" para cargar las
+                                    primeras.
+                                </td>
+                            </tr>
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+<!-- Fin del contenido de la página -->

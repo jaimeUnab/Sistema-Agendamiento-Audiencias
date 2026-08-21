@@ -74,6 +74,21 @@ class Causa(models.Model):
         # definen un orden por defecto.
         ordering = ["rit"]
 
+        # La combinación Competencia + RIT identifica una causa
+        # de forma única (verificado antes de agregar esta
+        # restricción que, a la fecha, no existían duplicados en
+        # la base de datos). La importación desde Excel
+        # (causas/services.py:ServicioImportacionCausas) depende
+        # de esta garantía para distinguir de forma confiable
+        # entre "causa nueva" y "causa ya existente", en vez de
+        # apoyarse únicamente en una consulta de la aplicación.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["competencia", "rit"],
+                name="unique_causa_por_competencia_y_rit"
+            )
+        ]
+
     def __str__(self):
         """
         Devuelve "RIT <rit> - <carátula>", por ejemplo:
