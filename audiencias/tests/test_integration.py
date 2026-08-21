@@ -822,10 +822,13 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
     """
     Prueba de integración de ver_trazabilidad_audiencia: verifica
     que la pantalla "Ver trazabilidad" (accesible desde la agenda
-    diaria) muestre EXCLUSIVAMENTE los campos que ya existen en
-    RegistroTrazabilidad (fechaHora, usuario, accion,
-    valoresAnteriores, valoresNuevos), filtrados por la audiencia
-    correcta y ordenados del más antiguo al más reciente.
+    diaria) muestre, para cada RegistroTrazabilidad, la información
+    legible correspondiente a la operación real que representa
+    -Creación, Baja/Dejar sin efecto o Anotación (ver
+    audiencias/views.py:_preparar_registro_trazabilidad)-, filtrada
+    por la audiencia correcta y ordenada del más antiguo al más
+    reciente. Una audiencia registrada no se puede modificar: no
+    existe una cuarta operación de "edición".
     """
 
     def setUp(self):
@@ -934,9 +937,14 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
             reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
         )
 
+        # El contexto "registros" ya no es el QuerySet crudo: es una
+        # lista de dicts armada por _preparar_registro_trazabilidad
+        # (ver audiencias/views.py). Si el filtro por audiencia
+        # fallara, aquí aparecerían 2 registros (el de self.audiencia
+        # y el de self.otra_audiencia creado en setUp), no 1.
         registros = respuesta.context["registros"]
         self.assertEqual(len(registros), 1)
-        self.assertEqual(registros[0].audiencia_id, self.audiencia.pk)
+        self.assertEqual(registros[0]["accionLabel"], "Creación de audiencia")
 
     def test_registros_ordenados_del_mas_antiguo_al_mas_reciente(self):
         primero = RegistroTrazabilidad.objects.create(
@@ -970,29 +978,152 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
             reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
         )
 
+        # Se compara por fechaHora (el dato que realmente define el
+        # orden), no por pk: el contexto "registros" ya no es el
+        # QuerySet crudo, es una lista de dicts (ver
+        # _preparar_registro_trazabilidad), que no exponen ".pk".
         registros = list(respuesta.context["registros"])
-        self.assertEqual([r.pk for r in registros], [primero.pk, segundo.pk])
+        self.assertEqual(
+            [r["fechaHora"] for r in registros],
+            [
+                datetime.datetime(2027, 5, 20, 9, 0, tzinfo=datetime.timezone.utc),
+                datetime.datetime(2027, 5, 20, 10, 0, tzinfo=datetime.timezone.utc),
+            ],
+        )
 
-    def test_muestra_exclusivamente_los_campos_existentes_del_modelo(self):
+    def _snapshot_base(self):
+        """
+        Snapshot base con la misma forma que produce
+        ServicioTrazabilidad.fotografiar() (audiencias/services.py)
+        para self.audiencia, usado por las pruebas de abajo para
+        armar valoresAnteriores/valoresNuevos realistas sin depender
+        de llamar al servicio de creación completo.
+        """
+        return {
+            "id": self.audiencia.id,
+            "causaId": self.causa.id,
+            "tipoAudienciaId": self.tipo_audiencia.id,
+            "salaId": self.sala.id,
+            "bloqueInicioId": self.bloque.id,
+            "cantidadBloques": 1,
+            "fecha": self.fecha.isoformat(),
+            "horaInicio": self.bloque.horaInicio.isoformat(),
+            "horaTermino": self.bloque.horaTermino.isoformat(),
+            "estado": "PROGRAMADA",
+            "motivoBaja": "",
+            "anotacion": "",
+            "fechaCreacion": "2027-05-20T08:00:00",
+            "usuarioCreacionId": self.usuario.id,
+        }
+
+    def test_registro_de_creacion_muestra_datos_legibles_y_oculta_ids_tecnicos(self):
+        """
+        Un registro de Creación debe mostrar "Creación de audiencia",
+        el nombre del tipo de audiencia y de la sala (no sus IDs),
+        fecha/horario agendado y cantidad de bloques. No debe
+        mostrar ningún ID técnico ni "estado"/"motivoBaja"/
+        "fechaCreacion" (ver audiencias/views.py:_detalleCreacion).
+        """
         RegistroTrazabilidad.objects.create(
             audiencia=self.audiencia,
             usuario=self.usuario,
-            accion=AccionTrazabilidad.MODIFICACION,
-            valoresAnteriores={"anotacion": "Texto anterior"},
-            valoresNuevos={"anotacion": "Texto nuevo"},
+            accion=AccionTrazabilidad.CREACION,
+            valoresAnteriores=None,
+            valoresNuevos=self._snapshot_base(),
         )
 
         respuesta = self.client.get(
             reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
         )
 
-        # accion (get_accion_display), usuario, y el contenido real
-        # de valoresAnteriores/valoresNuevos -tal cual están
-        # guardados, sin ningún campo inventado-.
-        self.assertContains(respuesta, "Modificación")
+        self.assertContains(respuesta, "Creación de audiencia")
+        self.assertContains(respuesta, self.tipo_audiencia.nombre)
+        self.assertContains(respuesta, self.sala.nombre)
+
+        # Ningún ID técnico debe filtrarse a la pantalla: la vista
+        # los resuelve a nombre legible o los descarta.
+        self.assertNotContains(respuesta, "causaId")
+        self.assertNotContains(respuesta, "tipoAudienciaId")
+        self.assertNotContains(respuesta, "salaId")
+        self.assertNotContains(respuesta, "bloqueInicioId")
+        self.assertNotContains(respuesta, "usuarioCreacionId")
+        self.assertNotContains(respuesta, "fechaCreacion")
+
+    def test_registro_de_baja_muestra_motivo_y_transicion_de_estado(self):
+        """
+        Un registro de Baja debe mostrar "Audiencia dejada sin
+        efecto", la transición "Programada → Eliminada" y el motivo
+        ingresado por el funcionario. No debe repetir el resto del
+        snapshot (tipo de audiencia, sala, cantidad de bloques, IDs):
+        ninguno de esos campos cambia al dar de baja una audiencia
+        (ver audiencias/views.py:_detalleBaja).
+        """
+        anteriores = self._snapshot_base()
+        nuevos = {
+            **self._snapshot_base(),
+            "estado": "ELIMINADA",
+            "motivoBaja": "Reprogramación",
+        }
+
+        RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.BAJA,
+            valoresAnteriores=anteriores,
+            valoresNuevos=nuevos,
+        )
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        self.assertContains(respuesta, "Audiencia dejada sin efecto")
+        self.assertContains(respuesta, "Reprogramación")
+        self.assertContains(respuesta, "Programada")
+        self.assertContains(respuesta, "Eliminada")
+
+        self.assertNotContains(respuesta, "tipoAudienciaId")
+        self.assertNotContains(respuesta, "salaId")
+        self.assertNotContains(respuesta, "bloqueInicioId")
+        self.assertNotContains(respuesta, "usuarioCreacionId")
+
+    def test_registro_de_anotacion_muestra_accion_y_contenido_legible(self):
+        """
+        AccionTrazabilidad no tiene un valor "ANOTACION": el registro
+        se guarda con accion=MODIFICACION (único flujo real que la
+        produce en todo el sistema, ver
+        guardar_anotacion_audiencia/audiencias/views.py), pero en
+        pantalla debe mostrarse como "Anotación" -no "Modificación"-,
+        junto con el contenido anterior/nuevo, sin repetir el resto
+        del snapshot (ver audiencias/views.py:_detalleAnotacion).
+        """
+        RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.MODIFICACION,
+            valoresAnteriores={
+                **self._snapshot_base(), "anotacion": "Texto anterior"
+            },
+            valoresNuevos={
+                **self._snapshot_base(), "anotacion": "Texto nuevo"
+            },
+        )
+
+        respuesta = self.client.get(
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
+        )
+
+        self.assertContains(respuesta, "Anotación")
+        self.assertNotContains(respuesta, "Modificación")
         self.assertContains(respuesta, str(self.usuario))
         self.assertContains(respuesta, "Texto anterior")
         self.assertContains(respuesta, "Texto nuevo")
+
+        self.assertNotContains(respuesta, "causaId")
+        self.assertNotContains(respuesta, "tipoAudienciaId")
+        self.assertNotContains(respuesta, "salaId")
+        self.assertNotContains(respuesta, "bloqueInicioId")
+        self.assertNotContains(respuesta, "usuarioCreacionId")
 
     def test_enlace_ver_trazabilidad_aparece_en_la_agenda_diaria(self):
         respuesta = self.client.get(

@@ -53,12 +53,16 @@ from django.urls import reverse
 # responsabilidad de la vista, nunca de services.py.
 from django.utils import timezone
 
-# Convierte el texto recibido en "?fecha=" (formato AAAA-MM-DD,
-# el mismo que entrega un <input type="date">) a un objeto
-# date. Devuelve None si el texto no tiene ese formato, sin
-# lanzar una excepción: permite validar la fecha recibida sin
-# try/except.
-from django.utils.dateparse import parse_date
+# Convierten el texto guardado en los snapshots de trazabilidad
+# (fecha/hora en formato ISO, el mismo que produce
+# ServicioTrazabilidad.fotografiar() con isoformat()) a objetos
+# date/time reales, para que el template los formatee con los
+# mismos filtros que el resto de la app (|date:"d/m/Y",
+# |time:"H:i"). parse_date también se usa para "?fecha=" en
+# agenda_diaria/ver_disponibilidad_audiencia (ver más abajo).
+# Ambas devuelven None si el texto no tiene el formato esperado,
+# sin lanzar una excepción.
+from django.utils.dateparse import parse_date, parse_time
 
 # Modelos necesarios para resolver los datos recibidos desde
 # los distintos pasos del flujo (buscar causa, solicitar
@@ -77,8 +81,12 @@ from .forms import AudienciaForm, DejarSinEfectoAudienciaForm, MotivoBaja
 
 # Modelo de audiencia del propio módulo: se usa en
 # ver_disponibilidad_audiencia para consultar (solo lectura)
-# qué bloques de una sala/fecha ya están ocupados.
-from .models import Audiencia, EstadoAudiencia
+# qué bloques de una sala/fecha ya están ocupados. AccionTrazabilidad
+# y EstadoAudiencia se usan en _preparar_registro_trazabilidad (ver
+# más abajo) para interpretar, solo para mostrar en pantalla, los
+# snapshots ya guardados por ServicioTrazabilidad -sin tocar cómo se
+# generan ni se almacenan-.
+from .models import AccionTrazabilidad, Audiencia, EstadoAudiencia
 
 # Servicios de negocio: coordinan la creación, la baja lógica, la
 # trazabilidad, y generan propuestas automáticas de fecha. Toda
@@ -928,6 +936,187 @@ def dejar_sin_efecto_audiencia(request):
 # =====================================================
 # TRAZABILIDAD (audiencia ya registrada, solo lectura)
 # =====================================================
+# Las funciones _nombreTipoAudiencia/_nombreSala/_etiquetaEstado/
+# _fechaDelSnapshot/_detalleCreacion/_detalleBaja/_detalleAnotacion/
+# _preparar_registro_trazabilidad, más abajo, son EXCLUSIVAMENTE de
+# presentación: traducen los snapshots JSON que ServicioTrazabilidad
+# ya guardó (fotografiar(), sin ningún cambio) a la información que
+# le sirve a un funcionario para leer el historial de una audiencia.
+# No crean, modifican ni recalculan ningún RegistroTrazabilidad; no
+# tocan Audiencia; no agregan ningún valor a AccionTrazabilidad. Una
+# audiencia registrada no se puede modificar -las únicas operaciones
+# reales son Creación, Baja/Dejar sin efecto y Anotación-, así que
+# esta interpretación cubre exactamente esas tres, nada más.
+
+def _nombreTipoAudiencia(tipo_audiencia_id):
+    """
+    Resuelve el ID de tipo de audiencia guardado en un snapshot a
+    su nombre legible. Como Audiencia.tipoAudiencia usa
+    on_delete=PROTECT, el TipoAudiencia referenciado por un ID ya
+    guardado nunca pudo eliminarse -pero igual se usa .first() (no
+    .get()) para no romper la pantalla si de todos modos faltara.
+    """
+    tipo = TipoAudiencia.objects.filter(pk=tipo_audiencia_id).first()
+    return tipo.nombre if tipo else "(tipo de audiencia no disponible)"
+
+
+def _nombreSala(sala_id):
+    """
+    Resuelve el ID de sala guardado en un snapshot a su nombre
+    legible. Mismo criterio que _nombreTipoAudiencia: Sala también
+    usa on_delete=PROTECT en Audiencia.
+    """
+    sala = Sala.objects.filter(pk=sala_id).first()
+    return sala.nombre if sala else "(sala no disponible)"
+
+
+def _etiquetaEstado(codigo_estado):
+    """
+    Traduce un código de estado guardado en un snapshot ("PROGRAMADA"
+    / "ELIMINADA") a la misma etiqueta legible que
+    EstadoAudiencia.choices ya define (Audiencia.get_estado_display()
+    no puede usarse aquí: el snapshot es un dict, no una instancia de
+    Audiencia).
+    """
+    if not codigo_estado:
+        return ""
+    try:
+        return EstadoAudiencia(codigo_estado).label
+    except ValueError:
+        # Defensivo: un código que no coincidiera con ningún valor
+        # de EstadoAudiencia se muestra tal cual, en vez de fallar.
+        return codigo_estado
+
+
+def _fechaDelSnapshot(snapshot):
+    """
+    Extrae fecha/horaInicio/horaTermino de un snapshot (dict) y los
+    convierte a objetos date/time reales -parse_date/parse_time,
+    mismas funciones que ya usa el resto de este módulo-, para que
+    el template los formatee con los filtros |date/|time de
+    siempre. Común a Creación, Baja y Anotación: ninguna de las
+    tres operaciones cambia la fecha ni el horario ya agendado de
+    la audiencia.
+    """
+    return {
+        "fecha": parse_date(snapshot.get("fecha")) if snapshot.get("fecha") else None,
+        "horaInicio": (
+            parse_time(snapshot.get("horaInicio"))
+            if snapshot.get("horaInicio")
+            else None
+        ),
+        "horaTermino": (
+            parse_time(snapshot.get("horaTermino"))
+            if snapshot.get("horaTermino")
+            else None
+        ),
+    }
+
+
+def _detalleCreacion(nuevos):
+    """
+    Arma el detalle a mostrar para un registro de Creación: tipo de
+    audiencia y sala ya resueltos a su nombre, fecha/horario
+    agendado, cantidad de bloques, y la anotación inicial SOLO si
+    no llegó vacía. No incluye ningún ID técnico (audiencia, causa,
+    tipoAudiencia, sala, bloqueInicio, usuarioCreacion), ni
+    "estado" (siempre nace PROGRAMADA, es obvio en una creación), ni
+    "motivoBaja" (siempre vacío acá), ni "fechaCreacion" (redundante
+    con la propia fechaHora del registro).
+    """
+    detalle = _fechaDelSnapshot(nuevos)
+    detalle["tipoAudiencia"] = _nombreTipoAudiencia(nuevos.get("tipoAudienciaId"))
+    detalle["sala"] = _nombreSala(nuevos.get("salaId"))
+    detalle["cantidadBloques"] = nuevos.get("cantidadBloques")
+
+    anotacion_inicial = (nuevos.get("anotacion") or "").strip()
+    detalle["anotacion"] = anotacion_inicial or None
+
+    return detalle
+
+
+def _detalleBaja(anteriores, nuevos):
+    """
+    Arma el detalle a mostrar para un registro de Baja: fecha/
+    horario agendado (sin cambios, se incluye solo como contexto),
+    la transición de estado ("Programada" -> "Eliminada") y el
+    motivo de la baja. No repite el resto de los campos del
+    snapshot (causa, tipo de audiencia, sala, bloque, cantidad de
+    bloques, anotación): ninguno cambia al dar de baja una
+    audiencia.
+    """
+    detalle = _fechaDelSnapshot(nuevos)
+    detalle["estadoAnterior"] = _etiquetaEstado(anteriores.get("estado"))
+    detalle["estadoNuevo"] = _etiquetaEstado(nuevos.get("estado"))
+    detalle["motivo"] = nuevos.get("motivoBaja") or ""
+
+    return detalle
+
+
+def _detalleAnotacion(anteriores, nuevos):
+    """
+    Arma el detalle a mostrar para un registro de Anotación: fecha/
+    horario agendado (sin cambios, se incluye solo como contexto), y
+    la anotación anterior/nueva. No repite el resto de los campos
+    del snapshot: ninguno cambia al modificar la anotación (es el
+    único campo que guardar_anotacion_audiencia toca).
+    """
+    detalle = _fechaDelSnapshot(nuevos)
+    detalle["anotacionAnterior"] = (anteriores.get("anotacion") or "").strip()
+    detalle["anotacionNueva"] = (nuevos.get("anotacion") or "").strip()
+
+    return detalle
+
+
+def _preparar_registro_trazabilidad(registro):
+    """
+    Traduce un RegistroTrazabilidad ya guardado (fechaHora, usuario,
+    accion, valoresAnteriores, valoresNuevos -tal cual los guarda
+    ServicioTrazabilidad, sin ningún cambio aquí ni en el modelo-) a
+    lo que realmente le sirve al funcionario, según la operación real
+    que representa.
+
+    IMPORTANTE: AccionTrazabilidad (audiencias/models.py) no tiene un
+    valor "ANOTACION". Hoy el único flujo de todo el sistema que
+    invoca ServicioTrazabilidad.registrarModificacion() es
+    guardar_anotacion_audiencia -no existe ninguna otra forma de
+    "modificar" una audiencia ya registrada, porque no se puede
+    editar-. Por eso, únicamente en esta interpretación para
+    pantalla (sin tocar el modelo ni el enum), un registro con
+    accion=MODIFICACION se rotula como "Anotación".
+
+    Devuelve un dict con "fechaHora", "usuario", "accionLabel", "tipo"
+    ("creacion"/"baja"/"anotacion", para que el template elija qué
+    bloque de detalle mostrar) y "detalle" (dict con las claves
+    específicas de esa operación, armado por _detalleCreacion/
+    _detalleBaja/_detalleAnotacion).
+    """
+    anteriores = registro.valoresAnteriores or {}
+    nuevos = registro.valoresNuevos or {}
+
+    if registro.accion == AccionTrazabilidad.CREACION:
+        tipo = "creacion"
+        accion_label = "Creación de audiencia"
+        detalle = _detalleCreacion(nuevos)
+    elif registro.accion == AccionTrazabilidad.BAJA:
+        tipo = "baja"
+        accion_label = "Audiencia dejada sin efecto"
+        detalle = _detalleBaja(anteriores, nuevos)
+    else:
+        # AccionTrazabilidad.MODIFICACION: ver nota de la sección
+        # arriba, hoy siempre corresponde al flujo de anotación.
+        tipo = "anotacion"
+        accion_label = "Anotación"
+        detalle = _detalleAnotacion(anteriores, nuevos)
+
+    return {
+        "fechaHora": registro.fechaHora,
+        "usuario": registro.usuario,
+        "accionLabel": accion_label,
+        "tipo": tipo,
+        "detalle": detalle,
+    }
+
 
 @login_required
 def ver_trazabilidad_audiencia(request, pk):
@@ -937,7 +1126,9 @@ def ver_trazabilidad_audiencia(request, pk):
     solo lectura: no crea, modifica ni elimina ningún
     RegistroTrazabilidad (esos ya quedaron creados por
     ServicioTrazabilidad al momento de cada operación real -
-    creación, modificación, baja-; esta vista únicamente consulta).
+    creación, baja, anotación-; esta vista únicamente consulta e
+    interpreta lo que ya existe, mediante
+    _preparar_registro_trazabilidad).
 
     Se accede desde el botón "Ver trazabilidad" de una fila de la
     agenda diaria (ver templates/audiencias/agenda.html). La
@@ -959,7 +1150,11 @@ def ver_trazabilidad_audiencia(request, pk):
     apoyarse en ese valor por defecto.
 
     select_related("usuario") evita una consulta adicional por cada
-    registro al mostrar su usuario responsable en el template.
+    registro al mostrar su usuario responsable en el template. El
+    contexto "registros" ya NO es el QuerySet crudo: es una lista de
+    dicts (uno por cada RegistroTrazabilidad, en el mismo orden),
+    armada por _preparar_registro_trazabilidad, lista para que el
+    template la recorra sin interpretar JSON ni resolver ningún ID.
 
     Si la audiencia no existe, responde con un error 404
     (get_object_or_404, mismo criterio que el resto de las vistas
@@ -972,9 +1167,13 @@ def ver_trazabilidad_audiencia(request, pk):
 
     audiencia = get_object_or_404(Audiencia, pk=pk)
 
-    registros = audiencia.registros_trazabilidad.select_related(
+    registros_crudos = audiencia.registros_trazabilidad.select_related(
         "usuario"
     ).order_by("fechaHora")
+
+    registros = [
+        _preparar_registro_trazabilidad(registro) for registro in registros_crudos
+    ]
 
     return render(
         request,

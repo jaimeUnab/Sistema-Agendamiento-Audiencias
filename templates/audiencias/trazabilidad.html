@@ -18,7 +18,10 @@ Trazabilidad de audiencia
 <!-- Encabezado de contexto (a qué audiencia pertenecen los
      registros de abajo), tomado directamente de la Audiencia real
      -no de RegistroTrazabilidad-: RIT y carátula ya se muestran así
-     en el resto de la app (agenda diaria, disponibilidad). -->
+     en el resto de la app (agenda diaria, disponibilidad). Como esta
+     pantalla es siempre de UNA audiencia (identificada por su "pk"
+     en la URL), RIT y carátula se fijan una única vez aquí y no se
+     repiten en cada registro del historial de abajo. -->
 
 <h5 class="mb-4">
     RIT {{ audiencia.causa.rit }} — {{ audiencia.causa.caratulado }}
@@ -27,11 +30,17 @@ Trazabilidad de audiencia
 <!-- ========================================= -->
 <!--   REGISTROS DE TRAZABILIDAD                -->
 <!-- ========================================= -->
-<!-- Muestra EXCLUSIVAMENTE los campos que ya existen en
-     RegistroTrazabilidad (audiencias/models.py): fechaHora, usuario,
-     accion, valoresAnteriores, valoresNuevos. No se agrega ningún
-     campo nuevo ni se calcula ninguna diferencia entre ambos JSON:
-     cada uno se muestra tal como fue guardado, clave por clave. -->
+<!-- Cada "registro" ya llega interpretado desde la vista
+     (audiencias/views.py:_preparar_registro_trazabilidad): no se
+     itera aquí ningún JSON crudo ni se muestra ningún ID técnico
+     (audiencia/causa/tipoAudiencia/sala/bloqueInicio/usuarioCreacion).
+     Los IDs siguen guardados tal cual en RegistroTrazabilidad -esto
+     es solo presentación-.
+
+     Una audiencia registrada no puede modificarse: las únicas
+     operaciones reales son Creación, Baja/Dejar sin efecto y
+     Anotación (registro.tipo distingue cuál de las tres es, para
+     elegir qué bloque de detalle mostrar). -->
 
 <div class="card shadow-sm">
 
@@ -42,53 +51,97 @@ Trazabilidad de audiencia
         <hr>
 
         {% if registros %}
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>Fecha y hora</th>
-                        <th>Usuario</th>
-                        <th>Acción</th>
-                        <th>Valores anteriores</th>
-                        <th>Valores nuevos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- order_by("fechaHora") ya aplicado en la vista
-                         (ver_trazabilidad_audiencia): del más antiguo
-                         al más reciente. -->
-                    {% for registro in registros %}
-                    <tr>
-                        <td>{{ registro.fechaHora|date:"d/m/Y H:i" }}</td>
-                        <td>{{ registro.usuario }}</td>
-                        <td>{{ registro.get_accion_display }}</td>
-                        <td>
-                            {% if registro.valoresAnteriores %}
-                                <ul class="mb-0 ps-3 small">
-                                    {% for clave, valor in registro.valoresAnteriores.items %}
-                                    <li>{{ clave }}: {{ valor }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if registro.valoresNuevos %}
-                                <ul class="mb-0 ps-3 small">
-                                    {% for clave, valor in registro.valoresNuevos.items %}
-                                    <li>{{ clave }}: {{ valor }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <span class="text-muted">—</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+
+        {% for registro in registros %}
+        <div class="pb-3 mb-3 {% if not forloop.last %}border-bottom{% endif %}">
+
+            <p class="mb-1">
+                <strong>{{ registro.fechaHora|date:"d/m/Y H:i" }}</strong>
+                — {{ registro.usuario }}
+            </p>
+
+            <p class="mb-2">
+                <strong>Acción:</strong> {{ registro.accionLabel }}
+            </p>
+
+            {% if registro.tipo == "creacion" %}
+            <!-- CREACIÓN: tipo de audiencia, sala, fecha/horario
+                 agendado, cantidad de bloques, y la anotación
+                 inicial solo si tiene contenido (detalle.anotacion
+                 queda en None cuando llegó vacía). -->
+            <ul class="mb-0 ps-3 small">
+                <li>Tipo de audiencia: {{ registro.detalle.tipoAudiencia }}</li>
+                <li>Sala: {{ registro.detalle.sala }}</li>
+                <li>Fecha agendada: {{ registro.detalle.fecha|date:"d/m/Y" }}</li>
+                <li>
+                    Horario agendado:
+                    {{ registro.detalle.horaInicio|time:"H:i" }} –
+                    {{ registro.detalle.horaTermino|time:"H:i" }}
+                </li>
+                <li>Cantidad de bloques: {{ registro.detalle.cantidadBloques }}</li>
+                {% if registro.detalle.anotacion %}
+                <li>Anotación inicial: {{ registro.detalle.anotacion }}</li>
+                {% endif %}
+            </ul>
+
+            {% elif registro.tipo == "baja" %}
+            <!-- BAJA / DEJAR SIN EFECTO: fecha/horario agendado (sin
+                 cambios, solo de contexto), transición de estado, y
+                 el motivo -el dato realmente relevante de esta
+                 operación-. No se repite el resto del snapshot
+                 (causa, tipo de audiencia, sala, bloque, cantidad de
+                 bloques, anotación): nada de eso cambia al dar de
+                 baja una audiencia. -->
+            <ul class="mb-0 ps-3 small">
+                <li>Fecha agendada: {{ registro.detalle.fecha|date:"d/m/Y" }}</li>
+                <li>
+                    Horario agendado:
+                    {{ registro.detalle.horaInicio|time:"H:i" }} –
+                    {{ registro.detalle.horaTermino|time:"H:i" }}
+                </li>
+                <li>
+                    Estado: {{ registro.detalle.estadoAnterior }}
+                    → {{ registro.detalle.estadoNuevo }}
+                </li>
+                <li>Motivo: {{ registro.detalle.motivo }}</li>
+            </ul>
+
+            {% else %}
+            <!-- ANOTACIÓN (registro.tipo == "anotacion"; en el
+                 modelo sigue siendo accion=MODIFICACION, ver
+                 audiencias/views.py:_preparar_registro_trazabilidad):
+                 fecha/horario agendado (sin cambios, solo de
+                 contexto), y la anotación anterior/nueva -el único
+                 campo que este flujo modifica-. -->
+            <ul class="mb-0 ps-3 small">
+                <li>Fecha agendada: {{ registro.detalle.fecha|date:"d/m/Y" }}</li>
+                <li>
+                    Horario agendado:
+                    {{ registro.detalle.horaInicio|time:"H:i" }} –
+                    {{ registro.detalle.horaTermino|time:"H:i" }}
+                </li>
+                <li>
+                    Anotación anterior:
+                    {% if registro.detalle.anotacionAnterior %}
+                        {{ registro.detalle.anotacionAnterior }}
+                    {% else %}
+                        <span class="text-muted">— sin anotación —</span>
+                    {% endif %}
+                </li>
+                <li>
+                    Anotación nueva:
+                    {% if registro.detalle.anotacionNueva %}
+                        {{ registro.detalle.anotacionNueva }}
+                    {% else %}
+                        <span class="text-muted">— sin anotación —</span>
+                    {% endif %}
+                </li>
+            </ul>
+            {% endif %}
+
         </div>
+        {% endfor %}
+
         {% else %}
         <!-- Sin registros: mensaje explícito, tal como se pidió,
              en vez de mostrar una tabla vacía sin explicación. -->
