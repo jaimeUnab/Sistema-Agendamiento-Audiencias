@@ -16,15 +16,36 @@ Agenda diaria
 {% block content %}
 
 <!-- ========================================= -->
-<!--   SELECTOR DE FECHA                        -->
+<!--   FILTROS: SALA + FECHA + NAVEGACIÓN       -->
 <!-- ========================================= -->
 <!-- method="get": esta pantalla es solo de consulta/lectura, no
-     modifica nada, por lo que la fecha viaja como parámetro de
-     consulta (?fecha=AAAA-MM-DD) y no como POST. Esto además permite
-     que la URL con una fecha específica se pueda volver a abrir o
-     compartir directamente. -->
+     modifica nada, por lo que sala y fecha viajan como parámetros de
+     consulta (?sala=<id>&fecha=AAAA-MM-DD) y no como POST. Esto
+     además permite que la URL con una sala/fecha específicas se
+     pueda volver a abrir o compartir directamente, y es lo que usan
+     los propios enlaces "←"/"→" de más abajo.
+
+     No se preselecciona ninguna sala por defecto: mientras
+     "sala_seleccionada" sea None (primer ingreso a la pantalla, o
+     todavía no se eligió ninguna), la primera opción "Seleccione una
+     sala" queda marcada y no se muestra ninguna agenda -ver el
+     bloque de resultados más abajo-. -->
 
 <form method="get" action="{% url 'agenda_diaria' %}" class="row g-3 align-items-end mb-4">
+
+    <div class="col-auto">
+        <label for="id_sala" class="form-label">Sala</label>
+        <select id="id_sala" name="sala" class="form-select">
+            <option value="" {% if not sala_seleccionada %}selected{% endif %}>
+                Seleccione una sala
+            </option>
+            {% for sala in salas %}
+            <option value="{{ sala.pk }}" {% if sala_seleccionada.pk == sala.pk %}selected{% endif %}>
+                {{ sala.nombre }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
 
     <div class="col-auto">
         <label for="id_fecha" class="form-label">Fecha</label>
@@ -36,9 +57,31 @@ Agenda diaria
     </div>
 
     <div class="col-auto">
-        <button type="submit" class="btn btn-primary">
-            Ver agenda
-        </button>
+        <!-- Grupo "← Ver agenda →": los dos enlaces de navegación
+             conservan la sala actualmente seleccionada
+             (sala_seleccionada.pk, vacío si todavía no hay ninguna:
+             en ese caso el enlace simplemente vuelve a caer en el
+             mismo estado "seleccione una sala", sin romper nada) y
+             se mueven un día hacia atrás/adelante respecto de la
+             fecha ya consultada (fecha_anterior/fecha_siguiente,
+             calculadas en la vista). Son <a href> simples, no botones
+             de formulario: no dependen de JavaScript y funcionan con
+             los botones atrás/adelante del navegador. -->
+        <div class="btn-group" role="group" aria-label="Navegación de fecha">
+            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_anterior|date:'Y-m-d' }}"
+               class="btn btn-outline-secondary"
+               aria-label="Día anterior">
+                &larr;
+            </a>
+            <button type="submit" class="btn btn-primary">
+                Ver agenda
+            </button>
+            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}"
+               class="btn btn-outline-secondary"
+               aria-label="Día siguiente">
+                &rarr;
+            </a>
+        </div>
     </div>
 
 </form>
@@ -46,33 +89,26 @@ Agenda diaria
 <h5 class="mb-4">{{ fecha|date:"d/m/Y" }}</h5>
 
 <!-- ========================================= -->
-<!--   SIN AUDIENCIAS PARA LA FECHA COMPLETA    -->
+<!--   RESULTADO: UNA SOLA SALA A LA VEZ        -->
 <!-- ========================================= -->
+<!-- Ya no se muestran todas las salas: solo la que fue elegida en el
+     <select> de arriba. Si todavía no se eligió ninguna, se pide
+     elegirla -nunca se cae de vuelta a mostrar todas por defecto-. -->
 
-{% if not hay_audiencias %}
+{% if not sala_seleccionada %}
 <p class="text-muted">
-    No hay audiencias programadas para esta fecha.
+    Seleccione una sala para ver su agenda.
 </p>
-{% endif %}
-
-<!-- ========================================= -->
-<!--   UNA SECCIÓN POR SALA                     -->
-<!-- ========================================= -->
-<!-- Se muestran TODAS las salas existentes (Sala.objects.all(), sin
-     buscar ni filtrar ninguna otra), cada una con sus audiencias
-     PROGRAMADAS de la fecha seleccionada, o "Sin audiencias
-     programadas." si no tiene ninguna ese día. -->
-
-{% for item in agenda_por_sala %}
+{% else %}
 <div class="card shadow-sm mb-3">
 
     <div class="card-body">
 
-        <h6 class="fw-bold">{{ item.sala.nombre }}</h6>
+        <h6 class="fw-bold">{{ sala_seleccionada.nombre }}</h6>
 
         <hr>
 
-        {% if item.audiencias %}
+        {% if hay_audiencias %}
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle mb-0">
                 <thead>
@@ -87,7 +123,7 @@ Agenda diaria
                     </tr>
                 </thead>
                 <tbody>
-                    {% for audiencia in item.audiencias %}
+                    {% for audiencia in audiencias %}
                     <tr>
                         <td>
                             {{ audiencia.horaInicio|time:"H:i" }} -
@@ -137,115 +173,23 @@ Agenda diaria
         </div>
         {% else %}
         <p class="text-muted mb-0">
-            Sin audiencias programadas.
+            Sin audiencias programadas para esta sala en la fecha seleccionada.
         </p>
         {% endif %}
 
     </div>
 
 </div>
-{% endfor %}
+{% endif %}
 
 <!-- ========================================= -->
 <!--   MODAL: DEJAR SIN EFECTO AUDIENCIA        -->
 <!-- ========================================= -->
-<!-- Único modal compartido por todas las filas de esta pantalla
-     (mismo criterio que modalCantidadBloques/modalAnotacion en
-     templates/audiencias/formulario.html): abrirModalDejarSinEfecto()
-     copia RIT/carátula/audiencia_id del botón clickeado (data-*)
-     dentro de este modal antes de mostrarlo, en vez de renderizar
-     un modal por cada audiencia.
+<!-- Extraído a un partial compartido con la Agenda semanal (ver
+     templates/audiencias/_modal_dejar_sin_efecto.html): mismo modal,
+     mismo <form>, mismo script, sin duplicar la lógica de baja en
+     dos plantillas. -->
 
-     Es un <form method="post"> real dirigido a
-     dejar_sin_efecto_audiencia: el envío ocurre solo si el
-     funcionario presiona "Dejar sin efecto" dentro del modal
-     (botón type="submit"), nunca al abrirlo. -->
-
-<div class="modal fade" id="modalDejarSinEfecto" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <form method="post" action="{% url 'dejar_sin_efecto_audiencia' %}">
-            {% csrf_token %}
-            <input type="hidden" name="audiencia_id" id="modal-baja-audiencia-id">
-
-            <div class="modal-content">
-
-                <div class="modal-header">
-                    <h6 class="modal-title fw-bold">Dejar sin efecto audiencia</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-
-                <div class="modal-body">
-
-                    <p class="mb-1"><strong>RIT:</strong> <span id="modal-baja-rit"></span></p>
-                    <p class="mb-3"><strong>Carátula:</strong> <span id="modal-baja-caratula"></span></p>
-
-                    <p>¿Desea dejar sin efecto esta audiencia?</p>
-
-                    <div class="mb-3">
-                        <label for="id_motivo_seleccionado" class="form-label">Motivo de eliminación</label>
-                        <select name="motivo_seleccionado" id="id_motivo_seleccionado" class="form-select" required>
-                            <option value="" selected disabled>Seleccione un motivo…</option>
-                            {% for valor, etiqueta in motivos_baja %}
-                            <option value="{{ valor }}">{{ etiqueta }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Oculto por defecto: solo se muestra (y se vuelve
-                         obligatorio) cuando el motivo elegido es "Otro"
-                         (ver el listener de "change" en el <script> de
-                         más abajo). -->
-                    <div id="contenedor-motivo-otro" class="d-none">
-                        <label for="id_motivo_otro" class="form-label">Explicación adicional</label>
-                        <textarea name="motivo_otro" id="id_motivo_otro" rows="2" class="form-control"></textarea>
-                    </div>
-
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-danger">
-                        Dejar sin efecto
-                    </button>
-                </div>
-
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-    // Copia los datos de la fila clickeada (RIT, carátula, id de la
-    // audiencia) al modal compartido, y reinicia el motivo/explicación
-    // de cualquier apertura anterior antes de mostrarlo.
-    function abrirModalDejarSinEfecto(boton) {
-        document.getElementById("modal-baja-audiencia-id").value = boton.dataset.audienciaId;
-        document.getElementById("modal-baja-rit").textContent = boton.dataset.rit;
-        document.getElementById("modal-baja-caratula").textContent = boton.dataset.caratula;
-
-        var selectMotivo = document.getElementById("id_motivo_seleccionado");
-        var campoOtro = document.getElementById("id_motivo_otro");
-
-        selectMotivo.value = "";
-        campoOtro.value = "";
-        document.getElementById("contenedor-motivo-otro").classList.add("d-none");
-        campoOtro.required = false;
-
-        var modal = new bootstrap.Modal(document.getElementById("modalDejarSinEfecto"));
-        modal.show();
-    }
-
-    // Muestra el campo de explicación (y lo vuelve obligatorio en el
-    // navegador) únicamente cuando el motivo elegido es "Otro". La
-    // validación real y obligatoria ocurre igualmente en el servidor
-    // (DejarSinEfectoAudienciaForm.clean()), esto es solo UX.
-    document.getElementById("id_motivo_seleccionado").addEventListener("change", function () {
-        var esOtro = this.value === "OTRO";
-        document.getElementById("contenedor-motivo-otro").classList.toggle("d-none", !esOtro);
-        document.getElementById("id_motivo_otro").required = esOtro;
-    });
-</script>
+{% include "audiencias/_modal_dejar_sin_efecto.html" %}
 
 {% endblock %}

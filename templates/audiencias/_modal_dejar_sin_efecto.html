@@ -1,0 +1,115 @@
+<!-- ========================================= -->
+<!--   PARTIAL: MODAL DEJAR SIN EFECTO AUDIENCIA -->
+<!-- ========================================= -->
+<!-- Extraído de templates/audiencias/agenda.html para que la Agenda
+     semanal (templates/audiencias/agenda_semanal.html) lo reutilice
+     tal cual -misma lógica de baja, un solo lugar-, en vez de
+     duplicar el modal y su script en dos plantillas. Cualquier
+     pantalla que lo incluya debe:
+     - pasar "motivos_baja" en su contexto (MotivoBaja.choices, ver
+       audiencias/views.py);
+     - tener, en cada fila de audiencia PROGRAMADA, un botón con
+       data-audiencia-id/data-rit/data-caratula y
+       onclick="abrirModalDejarSinEfecto(this)" (ver
+       templates/audiencias/agenda.html y
+       templates/audiencias/agenda_semanal.html para el ejemplo real).
+
+     Único modal compartido por todas las filas de la pantalla que lo
+     incluya (mismo criterio que modalCantidadBloques/modalAnotacion
+     en templates/audiencias/formulario.html): abrirModalDejarSinEfecto()
+     copia RIT/carátula/audiencia_id del botón clickeado (data-*)
+     dentro de este modal antes de mostrarlo, en vez de renderizar un
+     modal por cada audiencia.
+
+     Es un <form method="post"> real dirigido a
+     dejar_sin_efecto_audiencia (misma URL, mismo formulario, misma
+     vista, sin importar desde qué pantalla se abrió): el envío
+     ocurre solo si el funcionario presiona "Dejar sin efecto" dentro
+     del modal (botón type="submit"), nunca al abrirlo. -->
+
+<div class="modal fade" id="modalDejarSinEfecto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'dejar_sin_efecto_audiencia' %}">
+            {% csrf_token %}
+            <input type="hidden" name="audiencia_id" id="modal-baja-audiencia-id">
+
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold">Dejar sin efecto audiencia</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <p class="mb-1"><strong>RIT:</strong> <span id="modal-baja-rit"></span></p>
+                    <p class="mb-3"><strong>Carátula:</strong> <span id="modal-baja-caratula"></span></p>
+
+                    <p>¿Desea dejar sin efecto esta audiencia?</p>
+
+                    <div class="mb-3">
+                        <label for="id_motivo_seleccionado" class="form-label">Motivo de eliminación</label>
+                        <select name="motivo_seleccionado" id="id_motivo_seleccionado" class="form-select" required>
+                            <option value="" selected disabled>Seleccione un motivo…</option>
+                            {% for valor, etiqueta in motivos_baja %}
+                            <option value="{{ valor }}">{{ etiqueta }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Oculto por defecto: solo se muestra (y se vuelve
+                         obligatorio) cuando el motivo elegido es "Otro"
+                         (ver el listener de "change" en el <script> de
+                         más abajo). -->
+                    <div id="contenedor-motivo-otro" class="d-none">
+                        <label for="id_motivo_otro" class="form-label">Explicación adicional</label>
+                        <textarea name="motivo_otro" id="id_motivo_otro" rows="2" class="form-control"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        Dejar sin efecto
+                    </button>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Copia los datos de la fila clickeada (RIT, carátula, id de la
+    // audiencia) al modal compartido, y reinicia el motivo/explicación
+    // de cualquier apertura anterior antes de mostrarlo.
+    function abrirModalDejarSinEfecto(boton) {
+        document.getElementById("modal-baja-audiencia-id").value = boton.dataset.audienciaId;
+        document.getElementById("modal-baja-rit").textContent = boton.dataset.rit;
+        document.getElementById("modal-baja-caratula").textContent = boton.dataset.caratula;
+
+        var selectMotivo = document.getElementById("id_motivo_seleccionado");
+        var campoOtro = document.getElementById("id_motivo_otro");
+
+        selectMotivo.value = "";
+        campoOtro.value = "";
+        document.getElementById("contenedor-motivo-otro").classList.add("d-none");
+        campoOtro.required = false;
+
+        var modal = new bootstrap.Modal(document.getElementById("modalDejarSinEfecto"));
+        modal.show();
+    }
+
+    // Muestra el campo de explicación (y lo vuelve obligatorio en el
+    // navegador) únicamente cuando el motivo elegido es "Otro". La
+    // validación real y obligatoria ocurre igualmente en el servidor
+    // (DejarSinEfectoAudienciaForm.clean()), esto es solo UX.
+    document.getElementById("id_motivo_seleccionado").addEventListener("change", function () {
+        var esOtro = this.value === "OTRO";
+        document.getElementById("contenedor-motivo-otro").classList.toggle("d-none", !esOtro);
+        document.getElementById("id_motivo_otro").required = esOtro;
+    });
+</script>

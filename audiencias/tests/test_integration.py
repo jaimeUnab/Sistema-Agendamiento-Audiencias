@@ -339,7 +339,7 @@ class ConsultaAgendaIntegrationTests(TestCase):
 
     def test_agenda_muestra_la_audiencia_programada_de_la_fecha_consultada(self):
         respuesta = self.client.get(
-            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}"
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
         )
 
         self.assertEqual(respuesta.status_code, 200)
@@ -351,12 +351,447 @@ class ConsultaAgendaIntegrationTests(TestCase):
         fecha_sin_audiencias = self.fecha + datetime.timedelta(days=1)
 
         respuesta = self.client.get(
-            f"{reverse('agenda_diaria')}?fecha={fecha_sin_audiencias.isoformat()}"
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={fecha_sin_audiencias.isoformat()}"
         )
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertFalse(respuesta.context["hay_audiencias"])
         self.assertNotContains(respuesta, self.causa.rit)
+
+    def test_agenda_sin_sala_seleccionada_no_muestra_ninguna_audiencia(self):
+        """
+        Sin "sala" en la URL (primer ingreso a la pantalla, o
+        cualquier consulta que no la incluya), la agenda no debe
+        mostrar automáticamente todas las salas ni ninguna audiencia
+        -pedido explícito-, aunque exista una audiencia PROGRAMADA
+        ese mismo día.
+        """
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}"
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIsNone(respuesta.context["sala_seleccionada"])
+        self.assertFalse(respuesta.context["hay_audiencias"])
+        self.assertNotContains(respuesta, self.causa.rit)
+        self.assertContains(respuesta, "Seleccione una sala para ver su agenda.")
+
+    def test_agenda_muestra_solo_las_audiencias_de_la_sala_seleccionada(self):
+        """
+        Con dos salas que tienen audiencias PROGRAMADAS el mismo día,
+        seleccionar una de las dos debe mostrar únicamente sus
+        audiencias, sin mezclar las de la otra sala.
+        """
+        otra_sala = Sala.objects.create(
+            nombre="Otra Sala Agenda Integración", activa=True
+        )
+        otro_bloque = BloqueHorario.objects.create(
+            orden=9603, horaInicio=datetime.time(11, 0), horaTermino=datetime.time(11, 30)
+        )
+        audiencia_otra_sala = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=otra_sala,
+            bloqueInicio=otro_bloque,
+            cantidadBloques=1,
+            fecha=self.fecha,
+            horaInicio=otro_bloque.horaInicio,
+            horaTermino=otro_bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+        )
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+        )
+
+        # "otra_sala.nombre" sí aparece en el HTML -es una de las
+        # opciones del <select> "Sala"-, así que no corresponde
+        # comprobar su ausencia total en la respuesta: lo que importa
+        # es que sus audiencias no queden listadas en el resultado.
+        self.assertContains(respuesta, self.causa.rit)
+        self.assertContains(respuesta, self.sala.nombre)
+        audiencias_mostradas = list(respuesta.context["audiencias"])
+        self.assertIn(self.audiencia, audiencias_mostradas)
+        self.assertNotIn(audiencia_otra_sala, audiencias_mostradas)
+
+    def test_agenda_sala_seleccionada_sin_audiencias_muestra_mensaje(self):
+        fecha_sin_audiencias = self.fecha + datetime.timedelta(days=1)
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={fecha_sin_audiencias.isoformat()}"
+        )
+
+        self.assertContains(
+            respuesta,
+            "Sin audiencias programadas para esta sala en la fecha seleccionada.",
+        )
+
+    def test_flecha_izquierda_consulta_el_dia_anterior_conservando_la_sala(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+        )
+
+        dia_anterior = self.fecha - datetime.timedelta(days=1)
+        self.assertContains(
+            respuesta,
+            f"?sala={self.sala.pk}&fecha={dia_anterior.isoformat()}",
+        )
+
+    def test_flecha_derecha_consulta_el_dia_siguiente_conservando_la_sala(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+        )
+
+        dia_siguiente = self.fecha + datetime.timedelta(days=1)
+        self.assertContains(
+            respuesta,
+            f"?sala={self.sala.pk}&fecha={dia_siguiente.isoformat()}",
+        )
+
+    def test_selector_de_sala_de_la_agenda_no_ofrece_salas_inactivas(self):
+        """
+        El <select> "Sala" del filtro de la agenda debe ofrecer
+        únicamente salas activa=True -mismo criterio que
+        AudienciaForm ya aplica en "Nueva Audiencia" (ver
+        audiencias/forms.py)-. Una sala inactiva no debe poder
+        elegirse para consultar una agenda nueva.
+        """
+        sala_inactiva = Sala.objects.create(
+            nombre="Sala Agenda Inactiva", activa=False
+        )
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+        )
+
+        salas_del_selector = list(respuesta.context["salas"])
+        self.assertIn(self.sala, salas_del_selector)
+        self.assertNotIn(sala_inactiva, salas_del_selector)
+
+    def test_sala_desactivada_despues_de_registrada_no_altera_la_audiencia_historica(self):
+        """
+        Si la sala de una audiencia ya registrada se desactiva
+        después, la audiencia histórica no se modifica ni se
+        elimina (conserva su sala, fecha y horario tal cual), y su
+        agenda sigue pudiendo consultarse -es la sala NUEVA la que
+        deja de ofrecerse como opción del selector, no el acceso a
+        lo ya agendado-.
+        """
+        sala_id_original = self.audiencia.sala_id
+        fecha_original = self.audiencia.fecha
+        hora_inicio_original = self.audiencia.horaInicio
+        hora_termino_original = self.audiencia.horaTermino
+
+        self.sala.activa = False
+        self.sala.save(update_fields=["activa"])
+
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.sala_id, sala_id_original)
+        self.assertEqual(self.audiencia.fecha, fecha_original)
+        self.assertEqual(self.audiencia.horaInicio, hora_inicio_original)
+        self.assertEqual(self.audiencia.horaTermino, hora_termino_original)
+        self.assertTrue(Sala.objects.filter(pk=sala_id_original).exists())
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+        )
+
+        # El acceso directo/histórico a esa sala sigue funcionando...
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, self.causa.rit)
+        # ...pero ya no aparece entre las OPCIONES del selector.
+        self.assertNotIn(self.sala, list(respuesta.context["salas"]))
+
+
+# =====================================================
+# AGENDA SEMANAL
+# =====================================================
+
+class ConsultaAgendaSemanalIntegrationTests(TestCase):
+    """
+    Prueba de integración de la agenda semanal (agenda_semanal):
+    consulta de solo lectura de las audiencias PROGRAMADAS de una
+    sala, para la semana (lunes a domingo) de una fecha de
+    referencia. Mismo criterio de permisos que agenda_diaria: solo
+    exige login, sin restricción adicional de rol -no existe ningún
+    "@solo_administrador" en agenda_diaria, así que agregarlo
+    únicamente acá rompería la consistencia entre ambas agendas-.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="usuario_agenda_semanal_integracion",
+            email="agenda_semanal_integracion@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Agenda Semanal Integración",
+        )
+        self.competencia = Competencia.objects.create(
+            nombre="Competencia Agenda Semanal Integración"
+        )
+        self.tipo_audiencia = TipoAudiencia.objects.create(
+            nombre="Tipo Agenda Semanal Integración", activo=True
+        )
+        self.sala = Sala.objects.create(
+            nombre="Sala Agenda Semanal Integración", activa=True
+        )
+        self.causa = Causa.objects.create(
+            competencia=self.competencia,
+            rit="6003-2027",
+            ruc="2700060030-3",
+            caratulado="Causa Agenda Semanal Integración",
+        )
+        self.bloque = BloqueHorario.objects.create(
+            orden=9613, horaInicio=datetime.time(10, 0), horaTermino=datetime.time(10, 30)
+        )
+
+        # Fecha de referencia arbitraria; el lunes de su semana se
+        # calcula acá mismo (no se asume qué día de la semana es),
+        # con el mismo criterio que la propia vista usa.
+        self.fecha_referencia = datetime.date(2027, 4, 9)
+        self.lunes_semana = self.fecha_referencia - datetime.timedelta(
+            days=self.fecha_referencia.weekday()
+        )
+
+        self.audiencia = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=self.bloque,
+            cantidadBloques=1,
+            fecha=self.fecha_referencia,
+            horaInicio=self.bloque.horaInicio,
+            horaTermino=self.bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+        )
+
+        self.client.login(username=self.usuario.email, password="ClaveSegura123")
+
+    def test_requiere_login(self):
+        self.client.logout()
+
+        respuesta = self.client.get(reverse("agenda_semanal"))
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse("login"), respuesta.url)
+
+    def test_usuario_autenticado_puede_acceder(self):
+        respuesta = self.client.get(reverse("agenda_semanal"))
+
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_sin_sala_seleccionada_no_muestra_audiencias(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        self.assertIsNone(respuesta.context["sala_seleccionada"])
+        self.assertFalse(respuesta.context["hay_audiencias"])
+        self.assertNotContains(respuesta, self.causa.rit)
+        self.assertContains(
+            respuesta, "Seleccione una sala para consultar la agenda semanal."
+        )
+
+    def test_selector_de_sala_no_ofrece_salas_inactivas(self):
+        sala_inactiva = Sala.objects.create(
+            nombre="Sala Agenda Semanal Inactiva", activa=False
+        )
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        salas_del_selector = list(respuesta.context["salas"])
+        self.assertIn(self.sala, salas_del_selector)
+        self.assertNotIn(sala_inactiva, salas_del_selector)
+
+    def test_solo_muestra_audiencias_de_la_sala_seleccionada(self):
+        """
+        Combina la verificación de "sala seleccionada filtra
+        correctamente" y "audiencia de otra sala no aparece": una
+        segunda sala con una audiencia PROGRAMADA la misma semana no
+        debe mezclarse con los resultados de la sala consultada.
+        """
+        otra_sala = Sala.objects.create(
+            nombre="Otra Sala Agenda Semanal", activa=True
+        )
+        otro_bloque = BloqueHorario.objects.create(
+            orden=9614, horaInicio=datetime.time(11, 0), horaTermino=datetime.time(11, 30)
+        )
+        audiencia_otra_sala = Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=otra_sala,
+            bloqueInicio=otro_bloque,
+            cantidadBloques=1,
+            fecha=self.fecha_referencia,
+            horaInicio=otro_bloque.horaInicio,
+            horaTermino=otro_bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+        )
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        self.assertContains(respuesta, self.causa.rit)
+        audiencias_mostradas = [
+            audiencia
+            for dia in respuesta.context["dias_semana"]
+            for audiencia in dia["audiencias"]
+        ]
+        self.assertIn(self.audiencia, audiencias_mostradas)
+        self.assertNotIn(audiencia_otra_sala, audiencias_mostradas)
+
+    def test_la_semana_se_calcula_de_lunes_a_domingo_de_la_fecha_referencia(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        self.assertEqual(respuesta.context["inicio_semana"], self.lunes_semana)
+        self.assertEqual(
+            respuesta.context["fin_semana"],
+            self.lunes_semana + datetime.timedelta(days=6),
+        )
+
+        dias = respuesta.context["dias_semana"]
+        self.assertEqual(len(dias), 7)
+        self.assertEqual(dias[0]["fecha"], self.lunes_semana)
+        self.assertEqual(dias[0]["nombre"], "Lunes")
+        self.assertEqual(dias[6]["fecha"], self.lunes_semana + datetime.timedelta(days=6))
+        self.assertEqual(dias[6]["nombre"], "Domingo")
+
+    def test_semana_anterior_retrocede_siete_dias(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        semana_anterior = self.fecha_referencia - datetime.timedelta(days=7)
+        self.assertContains(
+            respuesta,
+            f"?sala={self.sala.pk}&fecha={semana_anterior.isoformat()}",
+        )
+
+    def test_semana_siguiente_avanza_siete_dias(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        semana_siguiente = self.fecha_referencia + datetime.timedelta(days=7)
+        self.assertContains(
+            respuesta,
+            f"?sala={self.sala.pk}&fecha={semana_siguiente.isoformat()}",
+        )
+
+    def test_navegacion_de_semana_conserva_la_sala_seleccionada(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        # Los tres enlaces de navegación (anterior/actual/siguiente)
+        # deben incluir la misma sala ya seleccionada.
+        self.assertContains(respuesta, f"?sala={self.sala.pk}&fecha=")
+        self.assertEqual(
+            respuesta.content.decode().count(f"sala={self.sala.pk}&fecha="),
+            3,
+        )
+
+    def test_audiencia_aparece_agrupada_en_su_dia_correcto(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        dia_con_la_audiencia = next(
+            dia
+            for dia in respuesta.context["dias_semana"]
+            if dia["fecha"] == self.fecha_referencia
+        )
+        self.assertIn(self.audiencia, dia_con_la_audiencia["audiencias"])
+
+        # El resto de los días de la semana no la muestran.
+        otros_dias = [
+            dia
+            for dia in respuesta.context["dias_semana"]
+            if dia["fecha"] != self.fecha_referencia
+        ]
+        for dia in otros_dias:
+            self.assertNotIn(self.audiencia, dia["audiencias"])
+
+    def test_dia_sin_audiencias_muestra_mensaje(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        self.assertContains(respuesta, "Sin audiencias programadas.")
+
+    def test_audiencia_eliminada_no_aparece_en_la_agenda_semanal(self):
+        self.client.post(
+            reverse("dejar_sin_efecto_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "motivo_seleccionado": "SOLICITUD_TRIBUNAL",
+            },
+        )
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        audiencias_mostradas = [
+            audiencia
+            for dia in respuesta.context["dias_semana"]
+            for audiencia in dia["audiencias"]
+        ]
+        self.assertNotIn(self.audiencia, audiencias_mostradas)
+
+        # La audiencia sigue existiendo -baja lógica, no eliminación
+        # física- y conserva su información histórica.
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.estado, EstadoAudiencia.ELIMINADA)
+        self.assertEqual(self.audiencia.fecha, self.fecha_referencia)
+
+    def test_enlace_ver_trazabilidad_aparece_en_la_agenda_semanal(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}"
+        )
+
+        self.assertContains(
+            respuesta,
+            reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk]),
+        )
+
+    def test_dejar_sin_efecto_desde_la_agenda_semanal_funciona(self):
+        """
+        El botón "Dejar sin efecto" de la agenda semanal envía al
+        mismo <form>/misma vista (dejar_sin_efecto_audiencia) que ya
+        usa agenda_diaria -sin ninguna lógica nueva-: se prueba el
+        flujo HTTP real, igual que
+        DejarSinEfectoAudienciaIntegrationTests.
+        """
+        respuesta = self.client.post(
+            reverse("dejar_sin_efecto_audiencia"),
+            {
+                "audiencia_id": self.audiencia.pk,
+                "motivo_seleccionado": "SUSPENSION",
+            },
+            follow=True,
+        )
+
+        self.assertContains(respuesta, "Audiencia dejada sin efecto correctamente.")
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.estado, EstadoAudiencia.ELIMINADA)
+        self.assertEqual(self.audiencia.motivoBaja, "Suspensión de la audiencia")
 
 
 # =====================================================
@@ -646,14 +1081,10 @@ class DejarSinEfectoAudienciaIntegrationTests(TestCase):
         )
 
         respuesta = self.client.get(
-            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}"
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
         )
 
-        audiencias_mostradas = [
-            audiencia
-            for item in respuesta.context["agenda_por_sala"]
-            for audiencia in item["audiencias"]
-        ]
+        audiencias_mostradas = list(respuesta.context["audiencias"])
 
         # La audiencia dada de baja ya no aparece...
         self.assertNotIn(self.audiencia, audiencias_mostradas)
@@ -1127,7 +1558,7 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
 
     def test_enlace_ver_trazabilidad_aparece_en_la_agenda_diaria(self):
         respuesta = self.client.get(
-            f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}"
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
         )
 
         self.assertContains(

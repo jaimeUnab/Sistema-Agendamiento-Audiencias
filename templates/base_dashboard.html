@@ -130,18 +130,88 @@
             </a>
 
 
-            <!-- Agenda -->
-            <!-- Antes href="#" (pendiente): la vista agenda_diaria ya
-                 existe (app audiencias) desde hace varias tareas, pero
-                 el enlace del menú nunca se conectó a ella. -->
+            <!-- ================================================= -->
+            <!--       SECCIÓN COLAPSABLE: AGENDA                  -->
+            <!-- ================================================= -->
+            <!--
+                Agrupa "Agenda diaria" y "Agenda semanal" (antes dos
+                ítems sueltos) bajo un único encabezado desplegable
+                "📅 Agenda", con el MISMO patrón de Bootstrap Collapse
+                que ya usa "⚙️ Configuración" más abajo en este mismo
+                archivo (data-bs-toggle="collapse", <div
+                class="collapse">, misma clase "menu-item" en el
+                encabezado, mismo ícono de flecha "bi-chevron-down").
+                bootstrap.bundle.min.js ya está cargado por el
+                proyecto: no se agrega ninguna librería nueva, ni se
+                crea un segundo sistema de navegación.
 
-            <a href="{% url 'agenda_diaria' %}" class="menu-item">
+                A diferencia de "Configuración", esta sección NO
+                queda restringida a Administrador: agenda_diaria y
+                agenda_semanal solo exigen login (@login_required,
+                sin @solo_administrador, ver audiencias/views.py), así
+                que envolver este bloque en la misma condición de rol
+                le ocultaría el menú a un usuario sin rol
+                Administrador que hoy sí puede ver ambas agendas
+                -sería una regresión de acceso, no solo un cambio
+                visual-.
 
-                <i class="bi bi-calendar3"></i>
+                Ni la vista, ni la URL, ni la lógica de ninguna de las
+                dos agendas se tocó: solo cambió su ubicación dentro
+                del menú.
 
-                <span>Agenda</span>
+                "¿la página actual pertenece a Agenda diaria o
+                semanal?" (para expandir/activar el encabezado
+                "Agenda") se verifica con el prefijo compartido de
+                ambas URLs, SIN la barra final ("/audiencias/agenda"):
+                así cubre tanto "/audiencias/agenda/" como
+                "/audiencias/agenda-semanal/" con una sola condición.
+                Cada enlace hijo, en cambio, usa su propio prefijo
+                COMPLETO (con la barra final:
+                "/audiencias/agenda/" vs. "/audiencias/agenda-semanal/")
+                para que cada uno se marque "active" únicamente en su
+                propia pantalla, sin que uno haga match con el otro.
+            -->
+
+            <a href="#menuAgenda"
+               class="menu-item {% if '/audiencias/agenda' in request.path %}active{% endif %}"
+               data-bs-toggle="collapse"
+               role="button"
+               aria-expanded="{% if '/audiencias/agenda' in request.path %}true{% else %}false{% endif %}"
+               aria-controls="menuAgenda">
+
+                <span>📅 Agenda</span> <i class="bi bi-chevron-down"></i>
 
             </a>
+
+            <div class="collapse {% if '/audiencias/agenda' in request.path %}show{% endif %}"
+                 id="menuAgenda">
+
+                <div class="d-flex flex-column" style="gap:4px;">
+
+                    <!-- Agenda diaria -->
+
+                    <a href="{% url 'agenda_diaria' %}" class="menu-item {% if '/audiencias/agenda/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-calendar3"></i>
+
+                        <span>Agenda diaria</span>
+
+                    </a>
+
+
+                    <!-- Agenda semanal -->
+
+                    <a href="{% url 'agenda_semanal' %}" class="menu-item {% if '/audiencias/agenda-semanal/' in request.path %}active{% endif %}">
+
+                        <i class="bi bi-calendar-week"></i>
+
+                        <span>Agenda semanal</span>
+
+                    </a>
+
+                </div>
+
+            </div>
 
 
             <!-- Nueva audiencia -->

@@ -19,6 +19,10 @@ services.py ni el formulario.
 # IMPORTACIONES
 # =====================================================
 
+# Usado en agenda_diaria para calcular el día anterior/siguiente al
+# consultado (fecha_anterior/fecha_siguiente de los enlaces "←"/"→").
+import datetime
+
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
@@ -683,9 +687,17 @@ def ver_disponibilidad_audiencia(request):
 @login_required
 def agenda_diaria(request):
     """
-    Muestra la agenda diaria de audiencias: para una fecha
-    seleccionada, lista las audiencias PROGRAMADAS de ese día,
-    agrupadas por sala.
+    Muestra la agenda diaria de audiencias de UNA sala, para una
+    fecha seleccionada: lista las audiencias PROGRAMADAS de esa
+    sala en ese día.
+
+    A diferencia del diseño anterior, ya NO se muestran
+    automáticamente todas las salas: el funcionario debe elegir
+    explícitamente cuál consultar (pedido explícito). Mientras no
+    haya una sala válida seleccionada, no se consulta ninguna
+    Audiencia -"sala_seleccionada" queda en None y el template
+    muestra el mensaje pidiendo elegir una sala-. Nunca se
+    preselecciona automáticamente la primera sala del catálogo.
 
     Es una vista de solo lectura, igual que
     ver_disponibilidad_audiencia: no crea, modifica ni da de
@@ -695,15 +707,26 @@ def agenda_diaria(request):
     propone nada, solo lista lo que ya existe en la base de
     datos-.
 
-    La fecha a consultar llega por GET (?fecha=AAAA-MM-DD, el
-    mismo formato que entrega un <input type="date">), porque
-    es una consulta/filtro, no una operación que cambie datos.
+    Tanto "sala" como "fecha" llegan por GET (?sala=<id>&fecha=
+    AAAA-MM-DD, el mismo formato que entrega un <input
+    type="date">), porque es una consulta/filtro, no una
+    operación que cambie datos. Esto permite que la URL con una
+    sala/fecha específicas se pueda volver a abrir o compartir
+    directamente, y es lo que usan los propios enlaces "día
+    anterior"/"día siguiente" del template (simples <a href>,
+    compatibles con los botones atrás/adelante del navegador, sin
+    necesitar JavaScript).
+
     Si no viene ninguna fecha (primer ingreso a la pantalla) se
     usa timezone.localdate() -nunca date.today()-, la fecha
     actual respetando la zona horaria del proyecto
     (America/Santiago, ver TIME_ZONE en settings). Si la fecha
     recibida no tiene un formato válido, se informa mediante el
-    framework de mensajes y se vuelve a usar la fecha actual.
+    framework de mensajes y se vuelve a usar la fecha actual. Si
+    "sala" no viene, o no corresponde a ninguna Sala existente,
+    se informa (solo en este segundo caso: no llegar con "sala"
+    es el estado inicial normal de la pantalla, no un error) y
+    "sala_seleccionada" queda en None.
 
     Solo los usuarios autenticados pueden acceder a esta vista
     (mismo criterio que el resto de las vistas del proyecto).
@@ -720,68 +743,280 @@ def agenda_diaria(request):
         fecha = timezone.localdate()
 
     # ---------------------------------------------------
-    # Consulta las audiencias PROGRAMADAS de la fecha
-    # seleccionada, usando exactamente el nombre de estado ya
+    # Sala consultada. No se elige ninguna por defecto: si "sala"
+    # no viene en la URL (primer ingreso a la pantalla),
+    # sala_seleccionada queda en None y no se consulta ninguna
+    # audiencia (ver docstring). Si viene pero no corresponde a
+    # ninguna Sala existente, se informa como error -a diferencia
+    # de que simplemente no venga, que es el estado inicial
+    # normal-.
+    # ---------------------------------------------------
+
+    sala_id = request.GET.get("sala")
+    sala_seleccionada = None
+
+    if sala_id:
+        sala_seleccionada = Sala.objects.filter(pk=sala_id).first()
+        if sala_seleccionada is None:
+            messages.error(request, "La sala seleccionada no es válida.")
+
+    # ---------------------------------------------------
+    # Consulta las audiencias PROGRAMADAS de la sala y fecha
+    # seleccionadas, usando exactamente el nombre de estado ya
     # definido en audiencias/models.py -
     # EstadoAudiencia.PROGRAMADA-, sin inventar ningún nombre
-    # nuevo. Las ELIMINADAS (baja lógica) quedan excluidas por
-    # el propio filtro.
+    # nuevo. Las ELIMINADAS (baja lógica) quedan excluidas por el
+    # propio filtro. Solo se consulta si hay una sala válida
+    # seleccionada -mismo criterio que "sala_seleccionada" recién
+    # explicado-.
     #
     # select_related evita una consulta adicional por cada
-    # audiencia al acceder a causa/tipoAudiencia/sala/
-    # bloqueInicio desde el template.
+    # audiencia al acceder a causa/tipoAudiencia/bloqueInicio
+    # desde el template ("sala" ya no hace falta, es siempre
+    # sala_seleccionada).
     #
-    # order_by("sala", "bloqueInicio__orden"): ordena primero
-    # por sala y, dentro de cada sala, por el orden del bloque
-    # de inicio, tal como fue pedido.
+    # order_by("bloqueInicio__orden"): ordena por el orden del
+    # bloque de inicio, tal como ya se hacía; ya no hace falta
+    # ordenar también por sala -ahora es una sola-.
     # ---------------------------------------------------
 
-    audiencias_del_dia = Audiencia.objects.filter(
-        fecha=fecha,
-        estado=EstadoAudiencia.PROGRAMADA,
-    ).select_related(
-        "causa",
-        "tipoAudiencia",
-        "sala",
-        "bloqueInicio",
-    ).order_by("sala", "bloqueInicio__orden")
+    if sala_seleccionada is not None:
+        audiencias = list(
+            Audiencia.objects.filter(
+                fecha=fecha,
+                sala=sala_seleccionada,
+                estado=EstadoAudiencia.PROGRAMADA,
+            ).select_related(
+                "causa",
+                "tipoAudiencia",
+                "bloqueInicio",
+            ).order_by("bloqueInicio__orden")
+        )
+    else:
+        audiencias = []
 
     # ---------------------------------------------------
-    # Agrupa las audiencias por sala en Python (una sola
-    # consulta ya trae todo lo necesario, gracias a
-    # select_related). Se muestran TODAS las salas existentes
-    # -no solo las que tengan audiencias ese día-: si una sala
-    # no tiene audiencias programadas, su sección igual
-    # aparece, con "Sin audiencias programadas.".
-    # Sala.objects.all() ya viene ordenada por nombre (Meta.
-    # ordering de Sala), sin necesidad de buscar ni modificar
-    # nada de la app Salas.
+    # Un día antes/después de la fecha consultada, para los
+    # enlaces "día anterior"/"día siguiente" del template. Se
+    # calculan siempre (aunque todavía no haya sala seleccionada):
+    # el propio template arma la URL de cada enlace combinando
+    # esta fecha con sala_seleccionada.pk (vacío si es None), así
+    # que la navegación de fecha nunca "pierde" la sala
+    # actualmente elegida, tal como fue pedido.
     # ---------------------------------------------------
 
-    audiencias_por_sala = {}
-    for audiencia in audiencias_del_dia:
-        audiencias_por_sala.setdefault(audiencia.sala_id, []).append(audiencia)
-
-    agenda_por_sala = [
-        {
-            "sala": sala,
-            "audiencias": audiencias_por_sala.get(sala.id, []),
-        }
-        for sala in Sala.objects.all()
-    ]
+    fecha_anterior = fecha - datetime.timedelta(days=1)
+    fecha_siguiente = fecha + datetime.timedelta(days=1)
 
     return render(
         request,
         "audiencias/agenda.html",
         {
             "fecha": fecha,
-            "agenda_por_sala": agenda_por_sala,
-            "hay_audiencias": bool(audiencias_por_sala),
+            "fecha_anterior": fecha_anterior,
+            "fecha_siguiente": fecha_siguiente,
+            # Salas ACTIVAS únicamente, para poblar el <select> "Sala"
+            # del formulario de filtros: una sala inactiva no debe
+            # poder elegirse para consultar una agenda nueva (mismo
+            # criterio que AudienciaForm.__init__ ya aplica para
+            # "Nueva Audiencia", ver audiencias/forms.py). Esto NO
+            # afecta a audiencias históricas: si "sala_seleccionada"
+            # llega por la URL apuntando a una sala que desde entonces
+            # se desactivó, igual se resuelve más arriba y su agenda
+            # histórica se sigue mostrando con normalidad -la
+            # restricción es solo sobre las OPCIONES ofrecidas en el
+            # selector, no sobre qué se puede seguir consultando-.
+            # Sala.objects.filter(activa=True) ya viene ordenada por
+            # nombre (Meta.ordering de Sala), sin necesidad de buscar
+            # ni modificar nada de la app Salas.
+            "salas": Sala.objects.filter(activa=True),
+            "sala_seleccionada": sala_seleccionada,
+            "audiencias": audiencias,
+            "hay_audiencias": bool(audiencias),
             # Opciones del <select> "Motivo de eliminación" del
             # modal "Dejar sin efecto" (ver
             # dejar_sin_efecto_audiencia más abajo). No es un
             # dato de la agenda en sí: se pasa aquí porque el
             # modal vive en este mismo template.
+            "motivos_baja": MotivoBaja.choices,
+        }
+    )
+
+
+# =====================================================
+# AGENDA SEMANAL (consulta de solo lectura)
+# =====================================================
+# Nombre de cada día de la semana (0=lunes ... 6=domingo, mismo
+# índice que datetime.date.weekday()), para no depender de la
+# localización del filtro |date:"l" de Django (el resto del
+# proyecto tampoco depende de ella, ver por ejemplo
+# _DIAS_SEMANA_PYTHON en audiencias/services.py, que resuelve el
+# mismo tipo de nombre con un diccionario explícito en vez de
+# localización).
+
+_NOMBRES_DIA_SEMANA = {
+    0: "Lunes",
+    1: "Martes",
+    2: "Miércoles",
+    3: "Jueves",
+    4: "Viernes",
+    5: "Sábado",
+    6: "Domingo",
+}
+
+
+@login_required
+def agenda_semanal(request):
+    """
+    Muestra la agenda semanal de audiencias de UNA sala: para una
+    fecha de referencia, calcula la semana completa (lunes a
+    domingo) a la que pertenece y lista, día por día, las
+    audiencias PROGRAMADAS de esa sala en esa semana.
+
+    Reutiliza exactamente el mismo criterio que agenda_diaria (ver
+    más arriba), solo que sobre un rango de 7 días en vez de un
+    único día: mismo filtro de sala (solo salas activa=True como
+    opciones del selector, sin restringir qué sala ya seleccionada
+    se puede seguir consultando), mismo estado
+    EstadoAudiencia.PROGRAMADA, mismo select_related, mismo criterio
+    de "no mostrar automáticamente todas las salas". No repite
+    ninguna regla de negocio de ValidadorAgendamiento ni de
+    GeneradorPropuestaFecha, ni reimplementa la baja lógica ni la
+    trazabilidad: la fila de cada audiencia reutiliza los mismos
+    botones/enlaces "Ver trazabilidad" y "Dejar sin efecto" que ya
+    usa agenda_diaria (mismo modal compartido, ver
+    templates/audiencias/_modal_dejar_sin_efecto.html), apuntando a
+    las mismas vistas (ver_trazabilidad_audiencia/
+    dejar_sin_efecto_audiencia) sin ninguna lógica nueva.
+
+    Tanto "sala" como "fecha" llegan por GET (?sala=<id>&fecha=
+    AAAA-MM-DD), igual que en agenda_diaria: permite compartir/
+    volver a abrir la URL y usar los botones atrás/adelante del
+    navegador, y es lo que usan los propios enlaces "semana
+    anterior"/"semana siguiente"/"semana actual" del template
+    (simples <a href>, sin JavaScript).
+
+    La semana se calcula con lunes como primer día
+    (fecha.weekday()==0), el mismo criterio de calendario que ya
+    usa el resto del proyecto (ver DiaSemana en
+    reglas_agendamiento/models.py, que tampoco cuenta sábado/
+    domingo como días de atención, aunque sí puedan existir
+    audiencias excepcionales esos días -no se filtran aquí-).
+
+    Solo los usuarios autenticados pueden acceder a esta vista
+    (mismo criterio que agenda_diaria y el resto de las vistas del
+    proyecto: sin restricción adicional de rol).
+    """
+
+    fecha_parametro = request.GET.get("fecha")
+
+    if fecha_parametro:
+        fecha_referencia = parse_date(fecha_parametro)
+        if fecha_referencia is None:
+            messages.error(request, "La fecha ingresada no es válida.")
+            fecha_referencia = timezone.localdate()
+    else:
+        fecha_referencia = timezone.localdate()
+
+    # -------------------------------------------------
+    # Semana de la fecha de referencia: lunes (weekday()==0) a
+    # domingo. Se recalcula siempre a partir de la fecha de
+    # referencia, nunca se recibe directamente por GET -evita
+    # que alguien arme una URL con un "inicio de semana" que no
+    # sea realmente un lunes-.
+    # -------------------------------------------------
+
+    inicio_semana = fecha_referencia - datetime.timedelta(
+        days=fecha_referencia.weekday()
+    )
+    fin_semana = inicio_semana + datetime.timedelta(days=6)
+    dias_de_la_semana = [
+        inicio_semana + datetime.timedelta(days=i) for i in range(7)
+    ]
+
+    # -------------------------------------------------
+    # Sala consultada: mismo criterio que agenda_diaria (ver su
+    # docstring). No se elige ninguna por defecto.
+    # -------------------------------------------------
+
+    sala_id = request.GET.get("sala")
+    sala_seleccionada = None
+
+    if sala_id:
+        sala_seleccionada = Sala.objects.filter(pk=sala_id).first()
+        if sala_seleccionada is None:
+            messages.error(request, "La sala seleccionada no es válida.")
+
+    # -------------------------------------------------
+    # Consulta única para toda la semana (un solo viaje a la base
+    # de datos, no siete), agrupada por día en Python -mismo
+    # patrón que agenda_diaria ya usaba para agrupar por sala,
+    # aplicado ahora a agrupar por fecha-. fecha__range es
+    # inclusivo en ambos extremos, así que cubre exactamente
+    # inicio_semana y fin_semana.
+    # -------------------------------------------------
+
+    if sala_seleccionada is not None:
+        audiencias_de_la_semana = Audiencia.objects.filter(
+            sala=sala_seleccionada,
+            fecha__range=(inicio_semana, fin_semana),
+            estado=EstadoAudiencia.PROGRAMADA,
+        ).select_related(
+            "causa",
+            "tipoAudiencia",
+            "bloqueInicio",
+        ).order_by("fecha", "bloqueInicio__orden")
+    else:
+        audiencias_de_la_semana = []
+
+    audiencias_por_dia = {}
+    for audiencia in audiencias_de_la_semana:
+        audiencias_por_dia.setdefault(audiencia.fecha, []).append(audiencia)
+
+    dias_semana = [
+        {
+            "fecha": dia,
+            "nombre": _NOMBRES_DIA_SEMANA[dia.weekday()],
+            "es_fin_de_semana": dia.weekday() >= 5,
+            "audiencias": audiencias_por_dia.get(dia, []),
+        }
+        for dia in dias_de_la_semana
+    ]
+
+    # -------------------------------------------------
+    # Una semana antes/después de la fecha de referencia (no del
+    # lunes de la semana), para los enlaces "semana anterior"/
+    # "semana siguiente": conservan la misma posición relativa
+    # dentro de la semana en vez de saltar siempre al lunes -no
+    # cambia en la práctica qué semana se calcula (el cálculo de
+    # arriba solo usa el día de la semana, no la posición), pero
+    # evita perder cuál fue el día exacto que el funcionario
+    # eligió originalmente-.
+    # -------------------------------------------------
+
+    semana_anterior_fecha = fecha_referencia - datetime.timedelta(days=7)
+    semana_siguiente_fecha = fecha_referencia + datetime.timedelta(days=7)
+
+    return render(
+        request,
+        "audiencias/agenda_semanal.html",
+        {
+            "fecha_referencia": fecha_referencia,
+            "inicio_semana": inicio_semana,
+            "fin_semana": fin_semana,
+            "semana_anterior_fecha": semana_anterior_fecha,
+            "semana_siguiente_fecha": semana_siguiente_fecha,
+            "hoy": timezone.localdate(),
+            # Salas ACTIVAS únicamente, mismo criterio que
+            # agenda_diaria (ver su propio comentario, más arriba en
+            # este archivo).
+            "salas": Sala.objects.filter(activa=True),
+            "sala_seleccionada": sala_seleccionada,
+            "dias_semana": dias_semana,
+            "hay_audiencias": bool(audiencias_de_la_semana),
+            # Mismas opciones que agenda_diaria, para el mismo modal
+            # compartido "Dejar sin efecto" (ver
+            # templates/audiencias/_modal_dejar_sin_efecto.html).
             "motivos_baja": MotivoBaja.choices,
         }
     )

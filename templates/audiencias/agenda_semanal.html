@@ -1,0 +1,224 @@
+{% extends 'base_dashboard.html' %}
+<!-- Reutiliza la misma estructura principal del sistema (menú lateral
+     y barra superior) y exactamente los mismos patrones visuales que
+     templates/audiencias/agenda.html (agenda diaria): mismos filtros
+     en fila, misma tarjeta por sección, misma tabla, mismos botones
+     "Ver trazabilidad"/"Dejar sin efecto", mismo modal compartido -no
+     es una interfaz nueva, es la misma aplicación con un rango de
+     fechas más amplio. -->
+
+{% block title %}
+Agenda semanal
+{% endblock %}
+
+{% block page_title %}
+Agenda semanal
+{% endblock %}
+
+{% block content %}
+
+<!-- ========================================= -->
+<!--   FILTROS: SALA + FECHA + NAVEGACIÓN       -->
+<!-- ========================================= -->
+<!-- method="get": esta pantalla es solo de consulta/lectura, no
+     modifica nada, por lo que sala y fecha viajan como parámetros de
+     consulta (?sala=<id>&fecha=AAAA-MM-DD) y no como POST -mismo
+     criterio que agenda_diaria-. Esto permite que la URL con una
+     sala/fecha de referencia específicas se pueda volver a abrir o
+     compartir directamente, y es lo que usan los propios enlaces de
+     navegación de semana de más abajo.
+
+     No se preselecciona ninguna sala por defecto: mientras
+     "sala_seleccionada" sea None (primer ingreso a la pantalla, o
+     todavía no se eligió ninguna), la primera opción "Seleccione una
+     sala" queda marcada y no se muestra ninguna agenda -ver el
+     bloque de resultados más abajo-. -->
+
+<form method="get" action="{% url 'agenda_semanal' %}" class="row g-3 align-items-end mb-3">
+
+    <div class="col-auto">
+        <label for="id_sala" class="form-label">Sala</label>
+        <select id="id_sala" name="sala" class="form-select">
+            <option value="" {% if not sala_seleccionada %}selected{% endif %}>
+                Seleccione una sala
+            </option>
+            {% for sala in salas %}
+            <option value="{{ sala.pk }}" {% if sala_seleccionada.pk == sala.pk %}selected{% endif %}>
+                {{ sala.nombre }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label for="id_fecha" class="form-label">Fecha de referencia</label>
+        <input type="date"
+               id="id_fecha"
+               name="fecha"
+               value="{{ fecha_referencia|date:'Y-m-d' }}"
+               class="form-control">
+    </div>
+
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">
+            Ver semana
+        </button>
+    </div>
+
+</form>
+
+<!-- ========================================= -->
+<!--   NAVEGACIÓN ENTRE SEMANAS                 -->
+<!-- ========================================= -->
+<!-- Los tres enlaces conservan la sala actualmente seleccionada
+     (sala_seleccionada.pk, vacío si todavía no hay ninguna: en ese
+     caso el enlace simplemente vuelve a caer en el mismo estado
+     "seleccione una sala", sin romper nada) -mismo criterio que las
+     flechas de agenda_diaria-. Son <a href> simples, no botones de
+     formulario: no dependen de JavaScript y funcionan con los
+     botones atrás/adelante del navegador. -->
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <div class="btn-group" role="group" aria-label="Navegación de semana">
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_anterior_fecha|date:'Y-m-d' }}"
+           class="btn btn-outline-secondary">
+            &larr; Semana anterior
+        </a>
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ hoy|date:'Y-m-d' }}"
+           class="btn btn-outline-secondary">
+            Semana actual
+        </a>
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_siguiente_fecha|date:'Y-m-d' }}"
+           class="btn btn-outline-secondary">
+            Semana siguiente &rarr;
+        </a>
+    </div>
+
+    <h5 class="mb-0">
+        Semana {{ inicio_semana|date:"d/m/Y" }} – {{ fin_semana|date:"d/m/Y" }}
+    </h5>
+
+</div>
+
+<!-- ========================================= -->
+<!--   RESULTADO: UNA SOLA SALA A LA VEZ        -->
+<!-- ========================================= -->
+<!-- Igual que agenda_diaria: solo se muestra la sala elegida en el
+     <select> de arriba. Si todavía no se eligió ninguna, se pide
+     elegirla -nunca se muestran varias salas mezcladas-. -->
+
+{% if not sala_seleccionada %}
+<p class="text-muted">
+    Seleccione una sala para consultar la agenda semanal.
+</p>
+{% else %}
+
+<!-- ========================================= -->
+<!--   UNA TARJETA POR DÍA (siempre los 7)      -->
+<!-- ========================================= -->
+<!-- dias_semana siempre trae los 7 días de la semana, tenga o no
+     audiencias cada uno -mismo criterio que agenda_diaria mostraba
+     antes todas las salas aunque no tuvieran audiencias-: ningún día
+     se oculta. Sábado/domingo se distinguen visualmente con un badge
+     ("Fin de semana"), sin ocultarlos ni excluirlos: si existiera una
+     audiencia excepcional esos días, igual se lista con normalidad. -->
+
+{% for dia in dias_semana %}
+<div class="card shadow-sm mb-3">
+
+    <div class="card-body">
+
+        <h6 class="fw-bold">
+            {{ dia.nombre }} {{ dia.fecha|date:"d/m" }}
+            {% if dia.es_fin_de_semana %}
+            <span class="badge bg-light text-secondary border ms-2">Fin de semana</span>
+            {% endif %}
+        </h6>
+
+        <hr>
+
+        {% if dia.audiencias %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>RIT</th>
+                        <th>Carátula</th>
+                        <th>Tipo de audiencia</th>
+                        <th>Cantidad de bloques</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for audiencia in dia.audiencias %}
+                    <tr>
+                        <td>
+                            {{ audiencia.horaInicio|time:"H:i" }} -
+                            {{ audiencia.horaTermino|time:"H:i" }}
+                        </td>
+                        <td>{{ audiencia.causa.rit }}</td>
+                        <td>{{ audiencia.causa.caratulado }}</td>
+                        <td>{{ audiencia.tipoAudiencia.nombre }}</td>
+                        <td>{{ audiencia.cantidadBloques }}</td>
+                        <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
+                        <td>
+                            <!-- Ver trazabilidad: mismo enlace GET de
+                                 solo lectura que usa agenda_diaria,
+                                 hacia la misma vista
+                                 (ver_trazabilidad_audiencia). -->
+                            <a href="{% url 'ver_trazabilidad_audiencia' audiencia.pk %}"
+                               class="btn btn-sm btn-outline-secondary">
+                                Ver trazabilidad
+                            </a>
+
+                            <!-- Dejar sin efecto: mismo botón que abre
+                                 el modal compartido (ver
+                                 templates/audiencias/
+                                 _modal_dejar_sin_efecto.html, incluido
+                                 al final de esta página), misma
+                                 función abrirModalDejarSinEfecto() que
+                                 ya usa agenda_diaria -ninguna lógica
+                                 nueva-. Todas las filas de esta tabla
+                                 ya son PROGRAMADA (el filtro de la
+                                 vista ya excluye ELIMINADA), no hace
+                                 falta ninguna condición adicional. -->
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    data-audiencia-id="{{ audiencia.id }}"
+                                    data-rit="{{ audiencia.causa.rit }}"
+                                    data-caratula="{{ audiencia.causa.caratulado }}"
+                                    onclick="abrirModalDejarSinEfecto(this)">
+                                Dejar sin efecto
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">
+            Sin audiencias programadas.
+        </p>
+        {% endif %}
+
+    </div>
+
+</div>
+{% endfor %}
+
+{% endif %}
+
+<!-- ========================================= -->
+<!--   MODAL: DEJAR SIN EFECTO AUDIENCIA        -->
+<!-- ========================================= -->
+<!-- Mismo partial compartido con agenda_diaria (ver
+     templates/audiencias/_modal_dejar_sin_efecto.html): mismo modal,
+     mismo <form>, mismo script, sin duplicar la lógica de baja. -->
+
+{% include "audiencias/_modal_dejar_sin_efecto.html" %}
+
+{% endblock %}
