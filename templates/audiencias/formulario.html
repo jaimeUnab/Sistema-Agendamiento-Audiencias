@@ -13,9 +13,23 @@
 Nueva Audiencia
 {% endblock %}
 
+<!-- Activa, solo para esta pantalla, el encabezado compacto
+     definido en static/css/style.css (selector
+     ".pagina-nueva-audiencia .topbar" / ".container-fluid.mt-4"):
+     ninguna otra pantalla del sistema define este bloque, así que
+     ninguna otra queda afectada. -->
+{% block body_class %}pagina-nueva-audiencia{% endblock %}
+
 {% block page_title %}
 Nueva Audiencia
 {% endblock %}
+
+<!-- Elimina el subtítulo genérico "Resumen general del sistema"
+     únicamente en esta pantalla (bloque vacío = no se renderiza
+     nada dentro de <p class="page-subtitle">). El resto de las
+     pantallas del sistema no sobrescribe este bloque, así que
+     conservan el subtítulo exactamente igual que antes. -->
+{% block page_subtitle %}{% endblock %}
 
 {% block content %}
 
@@ -84,22 +98,24 @@ Nueva Audiencia
          mediante competencia+rit; este template solo muestra el
          resultado (causa_encontrada), nunca decide la búsqueda. -->
 
-    <div class="card shadow-sm mb-3">
+    <div class="card shadow-sm mb-3 tarjeta-rit-compacta">
 
         <div class="card-body">
 
             <div class="row g-3 align-items-end">
 
-                <!-- "campo-formulario" (ver static/css/style.css): mismo
-                     criterio que la fila de Competencia/Tipo/Sala -label
-                     arriba, campo a todo el ancho disponible-. El botón
-                     "Buscar causa" queda justo al lado (mismo
-                     "d-flex gap-2" de siempre): no se le aplica esta
-                     clase, así que conserva su tamaño normal, sin
-                     volverse gigante. -->
-                <div class="col-md-5 campo-formulario">
-                    {{ form.rit.label_tag }}
-                    <div class="d-flex gap-2">
+                <!-- "campo-rit-inline" (ver static/css/style.css): label,
+                     campo y botón "Buscar causa" en una misma línea
+                     -a diferencia de "campo-formulario" (fila de
+                     Competencia/Tipo/Sala más abajo... arriba en el
+                     template), que apila el label sobre el campo-. El
+                     campo conserva su tamaño cómodo (ocupa el espacio
+                     sobrante entre el label y el botón); el botón
+                     conserva exactamente sus mismas clases/tamaño de
+                     siempre. -->
+                <div class="col-md-5">
+                    <div class="campo-rit-inline">
+                        {{ form.rit.label_tag }}
                         {{ form.rit }}
                         <!-- formnovalidate: tipoAudiencia/sala/fecha/
                              bloqueInicio -obligatorios para registrar-

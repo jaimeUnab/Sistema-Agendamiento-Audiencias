@@ -47,7 +47,14 @@
 
 </head>
 
-<body>
+<body class="{% block body_class %}{% endblock %}">
+<!-- "body_class" es un punto de extensión opcional: por defecto
+     queda vacío (class=""), sin ningún efecto en ninguna pantalla.
+     Una plantilla hija puede definirlo para activar, solo para sí
+     misma, estilos acotados en static/css/style.css (selector
+     ".<clase> .topbar", ".<clase> .container-fluid.mt-4", etc.),
+     sin tocar el diseño del resto del sistema. Ver
+     templates/audiencias/formulario.html ("Nueva Audiencia"). -->
 
 <!-- ========================================================= -->
 <!--            CONTENEDOR PRINCIPAL DEL SISTEMA               -->
@@ -431,7 +438,9 @@
 
                 <p class="page-subtitle">
 
-                    Resumen general del sistema
+                    {% block page_subtitle %}
+                        Resumen general del sistema
+                    {% endblock %}
 
                 </p>
 
