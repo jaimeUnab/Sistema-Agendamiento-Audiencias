@@ -30,9 +30,8 @@ Tipos de Audiencia
 
                     <h4>Listado de tipos de audiencia</h4>
 
-                    <!-- Botón que dirige al alta de un nuevo tipo de audiencia.
-                         Todavía no implementado (HU-13 solo cubre el listado). -->
-                    <a href="#" class="btn btn-primary">
+                    <!-- Botón que dirige al alta de un nuevo tipo de audiencia. -->
+                    <a href="{% url 'crear_tipo_audiencia' %}" class="btn btn-primary">
                         Nuevo
                     </a>
 
@@ -75,9 +74,8 @@ Tipos de Audiencia
                                 {% endif %}
                             </td>
                             <td>
-                                <!-- Botón que dirigirá a la edición de este tipo de audiencia.
-                                     Todavía no implementado (HU-13 solo cubre el listado). -->
-                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                <!-- Botón que dirige a la edición de este tipo de audiencia. -->
+                                <a href="{% url 'editar_tipo_audiencia' tipo.pk %}" class="btn btn-sm btn-outline-primary">
                                     Editar
                                 </a>
                             </td>
