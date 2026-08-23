@@ -17,6 +17,11 @@ Inicio
 <div class="row">
 
     <!-- Tarjeta: Audiencias del día -->
+    <!-- audiencias_del_dia: cantidad de Audiencia en estado
+         PROGRAMADA para la fecha de hoy (ver dashboard/views.py).
+         Se recalcula en cada ingreso a esta pantalla, directo desde
+         la base de datos -sin caché-, así que siempre refleja el
+         estado más reciente. -->
     <div class="col-md-6 mb-4">
 
         <div class="card shadow-sm">
@@ -27,7 +32,11 @@ Inicio
 
                 <hr>
 
+                {% if audiencias_del_dia %}
+                <p class="fs-1 fw-bold text-primary mb-0">{{ audiencias_del_dia }}</p>
+                {% else %}
                 <p>No existen audiencias programadas.</p>
+                {% endif %}
 
             </div>
 
@@ -36,6 +45,10 @@ Inicio
     </div>
 
     <!-- Tarjeta: Audiencias de la semana -->
+    <!-- audiencias_de_la_semana: cantidad de Audiencia en estado
+         PROGRAMADA dentro de la semana actual (lunes a domingo, ver
+         dashboard/views.py). Mismo criterio de "sin caché" que la
+         tarjeta anterior. -->
     <div class="col-md-6 mb-4">
 
         <div class="card shadow-sm">
@@ -46,7 +59,11 @@ Inicio
 
                 <hr>
 
+                {% if audiencias_de_la_semana %}
+                <p class="fs-1 fw-bold text-primary mb-0">{{ audiencias_de_la_semana }}</p>
+                {% else %}
                 <p>No existen audiencias programadas.</p>
+                {% endif %}
 
             </div>
 

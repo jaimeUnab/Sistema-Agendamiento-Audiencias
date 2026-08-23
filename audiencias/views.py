@@ -683,6 +683,62 @@ def ver_disponibilidad_audiencia(request):
 # =====================================================
 # AGENDA DIARIA (consulta de solo lectura)
 # =====================================================
+# Opciones del filtro "Estado", compartidas por agenda_diaria y
+# agenda_semanal (mismo <select>, mismos valores). El value de cada
+# opción es el valor REAL de EstadoAudiencia (o "" para "no filtrar
+# por estado" -"Todas"-): no se inventa ningún estado nuevo. La
+# etiqueta "Dejadas sin efecto" (en vez de "Eliminada", que es
+# EstadoAudiencia.ELIMINADA.label) reutiliza el mismo verbo que ya
+# usan en toda la app el botón "Dejar sin efecto" y su mensaje de
+# éxito ("Audiencia dejada sin efecto correctamente.", ver
+# dejar_sin_efecto_audiencia más abajo) -es la etiqueta que el
+# sistema ya usa para esta acción/estado, no una nueva.
+
+ESTADO_FILTRO_CHOICES = [
+    ("", "Todas"),
+    (EstadoAudiencia.PROGRAMADA, "Programadas"),
+    (EstadoAudiencia.ELIMINADA, "Dejadas sin efecto"),
+]
+
+# Valores válidos para "?estado=" (los mismos de arriba, como
+# conjunto, para validar lo recibido por GET sin repetir la lista).
+_VALORES_ESTADO_FILTRO_VALIDOS = {valor for valor, _ in ESTADO_FILTRO_CHOICES}
+
+
+def _resolver_filtro_estado(request):
+    """
+    Lee "estado" desde GET (?estado=PROGRAMADA/ELIMINADA, o ausente/
+    vacío para "Todas"), compartido por agenda_diaria y
+    agenda_semanal para no duplicar esta interpretación en las dos
+    vistas. Si el valor recibido no es ninguno de los válidos, se
+    informa como error (mismo criterio defensivo que ya usan "fecha"
+    y "sala" en ambas vistas) y se usa "" ("Todas") por defecto.
+    """
+    estado_parametro = request.GET.get("estado", "")
+
+    if estado_parametro not in _VALORES_ESTADO_FILTRO_VALIDOS:
+        messages.error(request, "El estado seleccionado no es válido.")
+        return ""
+
+    return estado_parametro
+
+
+def _mensaje_sin_audiencias(estado_seleccionado):
+    """
+    Texto del mensaje "sin audiencias" a mostrar según el filtro de
+    estado activo -compartido por agenda_diaria (sala+fecha) y cada
+    día de agenda_semanal-, para que ambas pantallas usen exactamente
+    la misma redacción por estado, sin mensajes contradictorios entre
+    sí. Con "Todas" (estado_seleccionado == "") devuelve None: cada
+    plantilla conserva su propio mensaje general ya existente, sin
+    cambios.
+    """
+    if estado_seleccionado == EstadoAudiencia.PROGRAMADA:
+        return "No existen audiencias programadas para los filtros seleccionados."
+    if estado_seleccionado == EstadoAudiencia.ELIMINADA:
+        return "No existen audiencias dejadas sin efecto para los filtros seleccionados."
+    return None
+
 
 @login_required
 def agenda_diaria(request):
@@ -761,12 +817,22 @@ def agenda_diaria(request):
             messages.error(request, "La sala seleccionada no es válida.")
 
     # ---------------------------------------------------
-    # Consulta las audiencias PROGRAMADAS de la sala y fecha
-    # seleccionadas, usando exactamente el nombre de estado ya
-    # definido en audiencias/models.py -
-    # EstadoAudiencia.PROGRAMADA-, sin inventar ningún nombre
-    # nuevo. Las ELIMINADAS (baja lógica) quedan excluidas por el
-    # propio filtro. Solo se consulta si hay una sala válida
+    # Filtro de estado (?estado=PROGRAMADA/ELIMINADA, o "" para
+    # "Todas"): ver _resolver_filtro_estado más arriba. No cambia
+    # ningún estado almacenado, solo decide qué mostrar.
+    # ---------------------------------------------------
+
+    estado_seleccionado = _resolver_filtro_estado(request)
+
+    # ---------------------------------------------------
+    # Consulta las audiencias de la sala y fecha seleccionadas,
+    # usando exactamente los nombres de estado ya definidos en
+    # audiencias/models.py -EstadoAudiencia-, sin inventar ningún
+    # nombre nuevo. Con "Todas" (estado_seleccionado == "") no se
+    # agrega ningún filtro de estado, así que aparecen tanto
+    # PROGRAMADA como ELIMINADA -son los únicos dos valores que
+    # existen-; con un valor concreto, se filtra únicamente por
+    # ese estado. Solo se consulta si hay una sala válida
     # seleccionada -mismo criterio que "sala_seleccionada" recién
     # explicado-.
     #
@@ -781,12 +847,12 @@ def agenda_diaria(request):
     # ---------------------------------------------------
 
     if sala_seleccionada is not None:
+        filtro_audiencias = {"fecha": fecha, "sala": sala_seleccionada}
+        if estado_seleccionado:
+            filtro_audiencias["estado"] = estado_seleccionado
+
         audiencias = list(
-            Audiencia.objects.filter(
-                fecha=fecha,
-                sala=sala_seleccionada,
-                estado=EstadoAudiencia.PROGRAMADA,
-            ).select_related(
+            Audiencia.objects.filter(**filtro_audiencias).select_related(
                 "causa",
                 "tipoAudiencia",
                 "bloqueInicio",
@@ -831,8 +897,17 @@ def agenda_diaria(request):
             # ni modificar nada de la app Salas.
             "salas": Sala.objects.filter(activa=True),
             "sala_seleccionada": sala_seleccionada,
+            # Opciones y valor actual del <select> "Estado" (ver
+            # ESTADO_FILTRO_CHOICES/_resolver_filtro_estado más
+            # arriba en este archivo).
+            "estados_filtro": ESTADO_FILTRO_CHOICES,
+            "estado_seleccionado": estado_seleccionado,
             "audiencias": audiencias,
             "hay_audiencias": bool(audiencias),
+            # Mensaje "sin audiencias" específico del estado filtrado
+            # (None con "Todas": el template conserva su mensaje
+            # general de siempre, sin cambios).
+            "mensaje_sin_audiencias": _mensaje_sin_audiencias(estado_seleccionado),
             # Opciones del <select> "Motivo de eliminación" del
             # modal "Dejar sin efecto" (ver
             # dejar_sin_efecto_audiencia más abajo). No es un
@@ -948,19 +1023,32 @@ def agenda_semanal(request):
             messages.error(request, "La sala seleccionada no es válida.")
 
     # -------------------------------------------------
+    # Filtro de estado: mismo criterio que agenda_diaria (ver
+    # _resolver_filtro_estado más arriba en este archivo).
+    # -------------------------------------------------
+
+    estado_seleccionado = _resolver_filtro_estado(request)
+
+    # -------------------------------------------------
     # Consulta única para toda la semana (un solo viaje a la base
     # de datos, no siete), agrupada por día en Python -mismo
     # patrón que agenda_diaria ya usaba para agrupar por sala,
     # aplicado ahora a agrupar por fecha-. fecha__range es
     # inclusivo en ambos extremos, así que cubre exactamente
-    # inicio_semana y fin_semana.
+    # inicio_semana y fin_semana. Con "Todas" no se agrega filtro
+    # de estado -mismo criterio que agenda_diaria-.
     # -------------------------------------------------
 
     if sala_seleccionada is not None:
+        filtro_audiencias = {
+            "sala": sala_seleccionada,
+            "fecha__range": (inicio_semana, fin_semana),
+        }
+        if estado_seleccionado:
+            filtro_audiencias["estado"] = estado_seleccionado
+
         audiencias_de_la_semana = Audiencia.objects.filter(
-            sala=sala_seleccionada,
-            fecha__range=(inicio_semana, fin_semana),
-            estado=EstadoAudiencia.PROGRAMADA,
+            **filtro_audiencias
         ).select_related(
             "causa",
             "tipoAudiencia",
@@ -1012,8 +1100,18 @@ def agenda_semanal(request):
             # este archivo).
             "salas": Sala.objects.filter(activa=True),
             "sala_seleccionada": sala_seleccionada,
+            # Opciones y valor actual del <select> "Estado" -mismo
+            # criterio que agenda_diaria (ver ESTADO_FILTRO_CHOICES/
+            # _resolver_filtro_estado más arriba en este archivo).
+            "estados_filtro": ESTADO_FILTRO_CHOICES,
+            "estado_seleccionado": estado_seleccionado,
             "dias_semana": dias_semana,
             "hay_audiencias": bool(audiencias_de_la_semana),
+            # Mensaje "sin audiencias" específico del estado filtrado,
+            # usado por cada tarjeta de día que no tenga audiencias
+            # (None con "Todas": cada día conserva su mensaje general
+            # de siempre, sin cambios).
+            "mensaje_sin_audiencias": _mensaje_sin_audiencias(estado_seleccionado),
             # Mismas opciones que agenda_diaria, para el mismo modal
             # compartido "Dejar sin efecto" (ver
             # templates/audiencias/_modal_dejar_sin_efecto.html).

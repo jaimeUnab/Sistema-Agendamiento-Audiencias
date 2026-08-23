@@ -504,6 +504,132 @@ class ConsultaAgendaIntegrationTests(TestCase):
         # ...pero ya no aparece entre las OPCIONES del selector.
         self.assertNotIn(self.sala, list(respuesta.context["salas"]))
 
+    # =================================================
+    # FILTRO DE ESTADO
+    # =================================================
+
+    def _crear_audiencia_eliminada(self, orden_bloque=9605):
+        """
+        Crea una segunda audiencia, en la misma sala/fecha que
+        self.audiencia, ya con estado=ELIMINADA -para probar el
+        filtro de estado sin depender del flujo HTTP de "Dejar sin
+        efecto" (ya probado aparte en
+        DejarSinEfectoAudienciaIntegrationTests)-.
+        """
+        bloque = BloqueHorario.objects.create(
+            orden=orden_bloque,
+            horaInicio=datetime.time(12, 0),
+            horaTermino=datetime.time(12, 30),
+        )
+        return Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=bloque,
+            cantidadBloques=1,
+            fecha=self.fecha,
+            horaInicio=bloque.horaInicio,
+            horaTermino=bloque.horaTermino,
+            estado=EstadoAudiencia.ELIMINADA,
+            motivoBaja="Prueba de filtro de estado",
+            usuarioCreacion=self.usuario,
+        )
+
+    def test_filtro_estado_todas_muestra_programadas_y_eliminadas(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado="
+        )
+
+        audiencias_mostradas = list(respuesta.context["audiencias"])
+        self.assertIn(self.audiencia, audiencias_mostradas)
+        self.assertIn(audiencia_eliminada, audiencias_mostradas)
+
+    def test_filtro_estado_programadas_excluye_dejadas_sin_efecto(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado=PROGRAMADA"
+        )
+
+        audiencias_mostradas = list(respuesta.context["audiencias"])
+        self.assertIn(self.audiencia, audiencias_mostradas)
+        self.assertNotIn(audiencia_eliminada, audiencias_mostradas)
+
+    def test_filtro_estado_dejadas_sin_efecto_excluye_programadas(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado=ELIMINADA"
+        )
+
+        audiencias_mostradas = list(respuesta.context["audiencias"])
+        self.assertNotIn(self.audiencia, audiencias_mostradas)
+        self.assertIn(audiencia_eliminada, audiencias_mostradas)
+
+    def test_mensaje_vacio_es_especifico_segun_el_estado_filtrado(self):
+        fecha_sin_audiencias = self.fecha + datetime.timedelta(days=30)
+
+        respuesta_programadas = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={fecha_sin_audiencias.isoformat()}&estado=PROGRAMADA"
+        )
+        self.assertContains(
+            respuesta_programadas,
+            "No existen audiencias programadas para los filtros seleccionados.",
+        )
+
+        respuesta_eliminadas = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={fecha_sin_audiencias.isoformat()}&estado=ELIMINADA"
+        )
+        self.assertContains(
+            respuesta_eliminadas,
+            "No existen audiencias dejadas sin efecto para los filtros seleccionados.",
+        )
+
+        # "Todas" conserva el mensaje general de siempre, sin cambios.
+        respuesta_todas = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={fecha_sin_audiencias.isoformat()}"
+        )
+        self.assertContains(
+            respuesta_todas,
+            "Sin audiencias programadas para esta sala en la fecha seleccionada.",
+        )
+
+    def test_flechas_de_dia_conservan_el_filtro_de_estado(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado=PROGRAMADA"
+        )
+
+        dia_anterior = self.fecha - datetime.timedelta(days=1)
+        dia_siguiente = self.fecha + datetime.timedelta(days=1)
+        self.assertContains(
+            respuesta,
+            f"fecha={dia_anterior.isoformat()}&estado=PROGRAMADA",
+        )
+        self.assertContains(
+            respuesta,
+            f"fecha={dia_siguiente.isoformat()}&estado=PROGRAMADA",
+        )
+
+    def test_filtro_de_estado_no_modifica_las_audiencias_en_la_base_de_datos(self):
+        estado_original = self.audiencia.estado
+
+        self.client.get(
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado=ELIMINADA"
+        )
+
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.estado, estado_original)
+
 
 # =====================================================
 # AGENDA SEMANAL
@@ -742,9 +868,15 @@ class ConsultaAgendaSemanalIntegrationTests(TestCase):
             },
         )
 
+        # Filtro estado=PROGRAMADA explícito: desde que existe el
+        # filtro de estado, "Todas" (sin especificar "estado") ya
+        # muestra ambos estados a propósito -esta prueba verifica
+        # específicamente que la audiencia dada de baja no aparezca
+        # al consultar solo las programadas, no que desaparezca de
+        # cualquier consulta-.
         respuesta = self.client.get(
             f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
-            f"&fecha={self.fecha_referencia.isoformat()}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado=PROGRAMADA"
         )
 
         audiencias_mostradas = [
@@ -792,6 +924,111 @@ class ConsultaAgendaSemanalIntegrationTests(TestCase):
         self.audiencia.refresh_from_db()
         self.assertEqual(self.audiencia.estado, EstadoAudiencia.ELIMINADA)
         self.assertEqual(self.audiencia.motivoBaja, "Suspensión de la audiencia")
+
+    # =================================================
+    # FILTRO DE ESTADO
+    # =================================================
+
+    def _crear_audiencia_eliminada(self, orden_bloque=9616):
+        """
+        Crea una segunda audiencia, en la misma sala/semana que
+        self.audiencia, ya con estado=ELIMINADA -mismo criterio que
+        ConsultaAgendaIntegrationTests._crear_audiencia_eliminada,
+        para probar el filtro de estado sin depender del flujo HTTP
+        de "Dejar sin efecto" (ya probado aparte)-.
+        """
+        bloque = BloqueHorario.objects.create(
+            orden=orden_bloque,
+            horaInicio=datetime.time(13, 0),
+            horaTermino=datetime.time(13, 30),
+        )
+        return Audiencia.objects.create(
+            causa=self.causa,
+            tipoAudiencia=self.tipo_audiencia,
+            sala=self.sala,
+            bloqueInicio=bloque,
+            cantidadBloques=1,
+            fecha=self.fecha_referencia,
+            horaInicio=bloque.horaInicio,
+            horaTermino=bloque.horaTermino,
+            estado=EstadoAudiencia.ELIMINADA,
+            motivoBaja="Prueba de filtro de estado",
+            usuarioCreacion=self.usuario,
+        )
+
+    def test_filtro_estado_todas_muestra_programadas_y_eliminadas_en_su_dia(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado="
+        )
+
+        dia = next(
+            dia
+            for dia in respuesta.context["dias_semana"]
+            if dia["fecha"] == self.fecha_referencia
+        )
+        self.assertIn(self.audiencia, dia["audiencias"])
+        self.assertIn(audiencia_eliminada, dia["audiencias"])
+
+    def test_filtro_estado_programadas_excluye_dejadas_sin_efecto(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado=PROGRAMADA"
+        )
+
+        audiencias_mostradas = [
+            audiencia
+            for dia in respuesta.context["dias_semana"]
+            for audiencia in dia["audiencias"]
+        ]
+        self.assertIn(self.audiencia, audiencias_mostradas)
+        self.assertNotIn(audiencia_eliminada, audiencias_mostradas)
+
+    def test_filtro_estado_dejadas_sin_efecto_excluye_programadas(self):
+        audiencia_eliminada = self._crear_audiencia_eliminada()
+
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado=ELIMINADA"
+        )
+
+        audiencias_mostradas = [
+            audiencia
+            for dia in respuesta.context["dias_semana"]
+            for audiencia in dia["audiencias"]
+        ]
+        self.assertNotIn(self.audiencia, audiencias_mostradas)
+        self.assertIn(audiencia_eliminada, audiencias_mostradas)
+
+    def test_navegacion_de_semana_conserva_el_filtro_de_estado(self):
+        respuesta = self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado=ELIMINADA"
+        )
+
+        semana_anterior = self.fecha_referencia - datetime.timedelta(days=7)
+        semana_siguiente = self.fecha_referencia + datetime.timedelta(days=7)
+        self.assertContains(
+            respuesta, f"fecha={semana_anterior.isoformat()}&estado=ELIMINADA"
+        )
+        self.assertContains(
+            respuesta, f"fecha={semana_siguiente.isoformat()}&estado=ELIMINADA"
+        )
+
+    def test_filtro_de_estado_no_modifica_las_audiencias_en_la_base_de_datos(self):
+        estado_original = self.audiencia.estado
+
+        self.client.get(
+            f"{reverse('agenda_semanal')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha_referencia.isoformat()}&estado=ELIMINADA"
+        )
+
+        self.audiencia.refresh_from_db()
+        self.assertEqual(self.audiencia.estado, estado_original)
 
 
 # =====================================================
@@ -1080,8 +1317,15 @@ class DejarSinEfectoAudienciaIntegrationTests(TestCase):
             },
         )
 
+        # Filtro estado=PROGRAMADA explícito: desde que existe el
+        # filtro de estado, "Todas" (sin especificar "estado") ya
+        # muestra ambos estados a propósito -esta prueba verifica
+        # específicamente que la audiencia dada de baja no aparezca
+        # al consultar solo las programadas, no que desaparezca de
+        # cualquier consulta-.
         respuesta = self.client.get(
-            f"{reverse('agenda_diaria')}?sala={self.sala.pk}&fecha={self.fecha.isoformat()}"
+            f"{reverse('agenda_diaria')}?sala={self.sala.pk}"
+            f"&fecha={self.fecha.isoformat()}&estado=PROGRAMADA"
         )
 
         audiencias_mostradas = list(respuesta.context["audiencias"])

@@ -369,6 +369,57 @@ a{
 
 
 /*
+    Logo del sistema en la pantalla de login
+    (templates/usuarios/login.html).
+
+    Misma técnica de recorte circular que ".logo"/".logo img" de
+    arriba (overflow:hidden + border-radius:50% + object-fit:cover
+    en la imagen), reutilizada tal cual -no se duplica el archivo
+    de imagen, solo se reutiliza el enfoque-. La diferencia es el
+    tamaño: acá es un valor fijo (no clamp() con vh) porque esta
+    pantalla no depende del sidebar ni de su lógica de escalado por
+    alto de ventana, es una tarjeta centrada de ancho fijo (450px).
+
+    width:100% + max-width:160px + aspect-ratio:1/1: el logo nunca
+    supera 160px de ancho (dentro del rango 140-180px pedido), la
+    altura se deriva automáticamente del propio ancho (nunca una
+    altura fija que pudiera deformar la imagen), y en pantallas más
+    angostas que 160px se achica junto con el contenedor -responsive-.
+*/
+.logo-login{
+
+    width:100%;
+
+    max-width:160px;
+
+    aspect-ratio:1/1;
+
+    border-radius:50%;
+
+    overflow:hidden;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+}
+
+.logo-login img{
+
+    width:100%;
+
+    height:100%;
+
+    object-fit:cover;
+
+    display:block;
+
+}
+
+
+/*
     Nombre del sistema.
 
     Es texto puramente decorativo/identificador, no un enlace de

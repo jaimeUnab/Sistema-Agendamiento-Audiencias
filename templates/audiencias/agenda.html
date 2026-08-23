@@ -16,14 +16,15 @@ Agenda diaria
 {% block content %}
 
 <!-- ========================================= -->
-<!--   FILTROS: SALA + FECHA + NAVEGACIÓN       -->
+<!--   FILTROS: SALA + FECHA + ESTADO + NAV.    -->
 <!-- ========================================= -->
 <!-- method="get": esta pantalla es solo de consulta/lectura, no
-     modifica nada, por lo que sala y fecha viajan como parámetros de
-     consulta (?sala=<id>&fecha=AAAA-MM-DD) y no como POST. Esto
-     además permite que la URL con una sala/fecha específicas se
-     pueda volver a abrir o compartir directamente, y es lo que usan
-     los propios enlaces "←"/"→" de más abajo.
+     modifica nada, por lo que sala, fecha y estado viajan como
+     parámetros de consulta (?sala=<id>&fecha=AAAA-MM-DD&estado=
+     PROGRAMADA/ELIMINADA, vacío para "Todas") y no como POST. Esto
+     además permite que la URL con una sala/fecha/estado específicos
+     se pueda volver a abrir o compartir directamente, y es lo que
+     usan los propios enlaces "←"/"→" de más abajo.
 
      No se preselecciona ninguna sala por defecto: mientras
      "sala_seleccionada" sea None (primer ingreso a la pantalla, o
@@ -57,18 +58,34 @@ Agenda diaria
     </div>
 
     <div class="col-auto">
+        <!-- Opciones/valores reales de EstadoAudiencia -ver
+             ESTADO_FILTRO_CHOICES en audiencias/views.py-: "" =
+             Todas, sin agregar ningún filtro de estado a la
+             consulta. -->
+        <label for="id_estado" class="form-label">Estado</label>
+        <select id="id_estado" name="estado" class="form-select">
+            {% for valor, etiqueta in estados_filtro %}
+            <option value="{{ valor }}" {% if estado_seleccionado == valor %}selected{% endif %}>
+                {{ etiqueta }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
         <!-- Grupo "← Ver agenda →": los dos enlaces de navegación
-             conservan la sala actualmente seleccionada
-             (sala_seleccionada.pk, vacío si todavía no hay ninguna:
-             en ese caso el enlace simplemente vuelve a caer en el
-             mismo estado "seleccione una sala", sin romper nada) y
-             se mueven un día hacia atrás/adelante respecto de la
-             fecha ya consultada (fecha_anterior/fecha_siguiente,
-             calculadas en la vista). Son <a href> simples, no botones
-             de formulario: no dependen de JavaScript y funcionan con
-             los botones atrás/adelante del navegador. -->
+             conservan la sala Y el estado actualmente seleccionados
+             (sala_seleccionada.pk/estado_seleccionado, vacíos si
+             todavía no hay ninguno elegido: en ese caso el enlace
+             simplemente vuelve a caer en el mismo estado "seleccione
+             una sala"/"Todas", sin romper nada) y se mueven un día
+             hacia atrás/adelante respecto de la fecha ya consultada
+             (fecha_anterior/fecha_siguiente, calculadas en la
+             vista). Son <a href> simples, no botones de formulario:
+             no dependen de JavaScript y funcionan con los botones
+             atrás/adelante del navegador. -->
         <div class="btn-group" role="group" aria-label="Navegación de fecha">
-            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_anterior|date:'Y-m-d' }}"
+            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_anterior|date:'Y-m-d' }}&estado={{ estado_seleccionado }}"
                class="btn btn-outline-secondary"
                aria-label="Día anterior">
                 &larr;
@@ -76,7 +93,7 @@ Agenda diaria
             <button type="submit" class="btn btn-primary">
                 Ver agenda
             </button>
-            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}"
+            <a href="{% url 'agenda_diaria' %}?sala={{ sala_seleccionada.pk }}&fecha={{ fecha_siguiente|date:'Y-m-d' }}&estado={{ estado_seleccionado }}"
                class="btn btn-outline-secondary"
                aria-label="Día siguiente">
                 &rarr;
@@ -133,30 +150,56 @@ Agenda diaria
                         <td>{{ audiencia.causa.caratulado }}</td>
                         <td>{{ audiencia.tipoAudiencia.nombre }}</td>
                         <td>{{ audiencia.cantidadBloques }}</td>
-                        <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
+                        <td>
+                            <!-- Con el filtro de Estado, esta tabla ya
+                                 puede mostrar audiencias ELIMINADA
+                                 además de PROGRAMADA (antes siempre
+                                 eran solo PROGRAMADA): el color del
+                                 badge distingue una de otra, mismo
+                                 criterio bg-success/bg-secondary que
+                                 ya usan los listados de Salas/Bloques/
+                                 Reglas para Activa/Inactiva. -->
+                            {% if audiencia.estado == 'PROGRAMADA' %}
+                            <span class="badge bg-primary">{{ audiencia.get_estado_display }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ audiencia.get_estado_display }}</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <!-- Ver trazabilidad: enlace GET de solo
                                  lectura (no un botón que abre un modal
                                  con POST, como "Dejar sin efecto"), ya
                                  que ver_trazabilidad_audiencia no
                                  modifica nada -identifica la audiencia
-                                 directamente por su pk en la URL. -->
+                                 directamente por su pk en la URL. Se
+                                 muestra sin importar el estado: es
+                                 justamente el historial, tiene sentido
+                                 también para una audiencia ya dejada
+                                 sin efecto. -->
                             <a href="{% url 'ver_trazabilidad_audiencia' audiencia.pk %}"
                                class="btn btn-sm btn-outline-secondary">
                                 Ver trazabilidad
                             </a>
 
-                            <!-- Todas las filas de esta tabla ya son
-                                 PROGRAMADA (agenda_diaria filtra por ese
-                                 estado): no hace falta una condición
-                                 adicional para mostrar este botón solo
-                                 en ese caso. El botón no envía nada por
-                                 sí mismo: solo abre el modal compartido
+                            <!-- Con el filtro de Estado, esta tabla ya
+                                 puede mostrar audiencias que ya están
+                                 ELIMINADA -antes todas eran siempre
+                                 PROGRAMADA-: el botón "Dejar sin
+                                 efecto" solo tiene sentido sobre una
+                                 audiencia todavía PROGRAMADA (el
+                                 servicio igual lo rechazaría con
+                                 "Esta audiencia ya fue dejada sin
+                                 efecto anteriormente", ver
+                                 ServicioBajaAudiencia, pero no
+                                 corresponde ni siquiera ofrecerlo).
+                                 El botón no envía nada por sí mismo:
+                                 solo abre el modal compartido
                                  "modalDejarSinEfecto" (ver más abajo),
                                  pasándole los datos de esta fila vía
                                  data-* (mismo patrón que
                                  fila.dataset.bloque/hora en
                                  templates/audiencias/formulario.html). -->
+                            {% if audiencia.estado == 'PROGRAMADA' %}
                             <button type="button"
                                     class="btn btn-sm btn-outline-danger"
                                     data-audiencia-id="{{ audiencia.id }}"
@@ -165,6 +208,7 @@ Agenda diaria
                                     onclick="abrirModalDejarSinEfecto(this)">
                                 Dejar sin efecto
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -173,7 +217,11 @@ Agenda diaria
         </div>
         {% else %}
         <p class="text-muted mb-0">
-            Sin audiencias programadas para esta sala en la fecha seleccionada.
+            {% if mensaje_sin_audiencias %}
+                {{ mensaje_sin_audiencias }}
+            {% else %}
+                Sin audiencias programadas para esta sala en la fecha seleccionada.
+            {% endif %}
         </p>
         {% endif %}
 

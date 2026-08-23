@@ -245,3 +245,46 @@ class CambiarEstadoSalaTests(TestCase):
             f"Sala «{self.sala.nombre}» activada correctamente.",
             mensajes_2,
         )
+
+
+# =====================================================
+# LISTADO ADMINISTRATIVO (debe seguir mostrando inactivas)
+# =====================================================
+
+class ListaSalasIntegrationTests(TestCase):
+    """
+    Prueba de integración de lista_salas: a diferencia de los
+    SELECTORES de sala (el <select> de "Nueva Audiencia" y el de
+    la Agenda, que solo ofrecen salas activa=True), este listado
+    administrativo debe seguir mostrando TODAS las salas -activas
+    e inactivas-, cada una con su estado real, para que el
+    administrador pueda ver y reactivar una sala desactivada.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="usuario_pruebas_lista_salas",
+            email="pruebas_lista_salas@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario de Pruebas",
+            rol=RolUsuario.ADMINISTRADOR,
+        )
+        self.client.force_login(self.usuario)
+
+        self.sala_activa = Sala.objects.create(
+            nombre="Sala Listado Activa", activa=True
+        )
+        self.sala_inactiva = Sala.objects.create(
+            nombre="Sala Listado Inactiva", activa=False
+        )
+
+    def test_el_listado_muestra_tanto_salas_activas_como_inactivas(self):
+        respuesta = self.client.get(reverse("lista_salas"))
+
+        salas_mostradas = list(respuesta.context["salas"])
+        self.assertIn(self.sala_activa, salas_mostradas)
+        self.assertIn(self.sala_inactiva, salas_mostradas)
+
+        self.assertContains(respuesta, self.sala_activa.nombre)
+        self.assertContains(respuesta, self.sala_inactiva.nombre)
+        self.assertContains(respuesta, "Inactiva")

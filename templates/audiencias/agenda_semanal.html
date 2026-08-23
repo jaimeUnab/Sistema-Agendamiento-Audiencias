@@ -60,6 +60,22 @@ Agenda semanal
     </div>
 
     <div class="col-auto">
+        <!-- Opciones/valores reales de EstadoAudiencia -mismo
+             criterio y mismas opciones que agenda_diaria, ver
+             ESTADO_FILTRO_CHOICES en audiencias/views.py-: "" =
+             Todas, sin agregar ningún filtro de estado a la
+             consulta. -->
+        <label for="id_estado" class="form-label">Estado</label>
+        <select id="id_estado" name="estado" class="form-select">
+            {% for valor, etiqueta in estados_filtro %}
+            <option value="{{ valor }}" {% if estado_seleccionado == valor %}selected{% endif %}>
+                {{ etiqueta }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
         <button type="submit" class="btn btn-primary">
             Ver semana
         </button>
@@ -70,26 +86,27 @@ Agenda semanal
 <!-- ========================================= -->
 <!--   NAVEGACIÓN ENTRE SEMANAS                 -->
 <!-- ========================================= -->
-<!-- Los tres enlaces conservan la sala actualmente seleccionada
-     (sala_seleccionada.pk, vacío si todavía no hay ninguna: en ese
-     caso el enlace simplemente vuelve a caer en el mismo estado
-     "seleccione una sala", sin romper nada) -mismo criterio que las
-     flechas de agenda_diaria-. Son <a href> simples, no botones de
+<!-- Los tres enlaces conservan la sala Y el estado actualmente
+     seleccionados (sala_seleccionada.pk/estado_seleccionado, vacíos
+     si todavía no hay ninguno elegido: en ese caso el enlace
+     simplemente vuelve a caer en el mismo estado "seleccione una
+     sala"/"Todas", sin romper nada) -mismo criterio que las flechas
+     de agenda_diaria-. Son <a href> simples, no botones de
      formulario: no dependen de JavaScript y funcionan con los
      botones atrás/adelante del navegador. -->
 
 <div class="d-flex justify-content-between align-items-center mb-4">
 
     <div class="btn-group" role="group" aria-label="Navegación de semana">
-        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_anterior_fecha|date:'Y-m-d' }}"
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_anterior_fecha|date:'Y-m-d' }}&estado={{ estado_seleccionado }}"
            class="btn btn-outline-secondary">
             &larr; Semana anterior
         </a>
-        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ hoy|date:'Y-m-d' }}"
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ hoy|date:'Y-m-d' }}&estado={{ estado_seleccionado }}"
            class="btn btn-outline-secondary">
             Semana actual
         </a>
-        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_siguiente_fecha|date:'Y-m-d' }}"
+        <a href="{% url 'agenda_semanal' %}?sala={{ sala_seleccionada.pk }}&fecha={{ semana_siguiente_fecha|date:'Y-m-d' }}&estado={{ estado_seleccionado }}"
            class="btn btn-outline-secondary">
             Semana siguiente &rarr;
         </a>
@@ -163,12 +180,25 @@ Agenda semanal
                         <td>{{ audiencia.causa.caratulado }}</td>
                         <td>{{ audiencia.tipoAudiencia.nombre }}</td>
                         <td>{{ audiencia.cantidadBloques }}</td>
-                        <td><span class="badge bg-primary">{{ audiencia.get_estado_display }}</span></td>
+                        <td>
+                            <!-- Con el filtro de Estado, esta tabla ya
+                                 puede mostrar audiencias ELIMINADA
+                                 además de PROGRAMADA (antes siempre
+                                 eran solo PROGRAMADA): el color del
+                                 badge distingue una de otra -mismo
+                                 criterio que agenda_diaria-. -->
+                            {% if audiencia.estado == 'PROGRAMADA' %}
+                            <span class="badge bg-primary">{{ audiencia.get_estado_display }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ audiencia.get_estado_display }}</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <!-- Ver trazabilidad: mismo enlace GET de
                                  solo lectura que usa agenda_diaria,
                                  hacia la misma vista
-                                 (ver_trazabilidad_audiencia). -->
+                                 (ver_trazabilidad_audiencia). Se
+                                 muestra sin importar el estado. -->
                             <a href="{% url 'ver_trazabilidad_audiencia' audiencia.pk %}"
                                class="btn btn-sm btn-outline-secondary">
                                 Ver trazabilidad
@@ -181,10 +211,14 @@ Agenda semanal
                                  al final de esta página), misma
                                  función abrirModalDejarSinEfecto() que
                                  ya usa agenda_diaria -ninguna lógica
-                                 nueva-. Todas las filas de esta tabla
-                                 ya son PROGRAMADA (el filtro de la
-                                 vista ya excluye ELIMINADA), no hace
-                                 falta ninguna condición adicional. -->
+                                 nueva-. Con el filtro de Estado, esta
+                                 tabla ya puede mostrar audiencias que
+                                 ya están ELIMINADA (antes el filtro
+                                 fijo de la vista lo impedía): el botón
+                                 solo tiene sentido sobre una audiencia
+                                 todavía PROGRAMADA -mismo criterio que
+                                 agenda_diaria-. -->
+                            {% if audiencia.estado == 'PROGRAMADA' %}
                             <button type="button"
                                     class="btn btn-sm btn-outline-danger"
                                     data-audiencia-id="{{ audiencia.id }}"
@@ -193,6 +227,7 @@ Agenda semanal
                                     onclick="abrirModalDejarSinEfecto(this)">
                                 Dejar sin efecto
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -201,7 +236,11 @@ Agenda semanal
         </div>
         {% else %}
         <p class="text-muted mb-0">
-            Sin audiencias programadas.
+            {% if mensaje_sin_audiencias %}
+                {{ mensaje_sin_audiencias }}
+            {% else %}
+                Sin audiencias programadas.
+            {% endif %}
         </p>
         {% endif %}
 

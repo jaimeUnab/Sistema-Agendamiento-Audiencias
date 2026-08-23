@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Inicio de sesión{% endblock %}
 
@@ -7,6 +8,20 @@
 <div class="container vh-100 d-flex justify-content-center align-items-center">
 
     <div class="card shadow-lg p-5" style="width:450px; border-radius:20px;">
+
+        <!-- Logo oficial del sistema (mismo archivo que usa el sidebar en
+             base_dashboard.html: static/img/icono programa.png, no se
+             duplica). "logo-login" (ver static/css/style.css) reutiliza la
+             misma técnica de recorte circular que ".logo" del sidebar
+             -overflow:hidden + border-radius:50% + object-fit:cover-, solo
+             que con un tamaño fijo (no vh-relativo) apropiado para esta
+             tarjeta centrada, en vez del clamp() pensado para el sidebar. -->
+        <div class="text-center mb-3">
+            <div class="logo-login mx-auto">
+                <img src="{% static 'img/icono programa.png' %}"
+                     alt="Sistema de Agendamiento de Audiencias">
+            </div>
+        </div>
 
         <div class="text-center mb-4">
 
