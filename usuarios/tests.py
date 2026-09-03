@@ -1,10 +1,13 @@
 """
 Módulo de pruebas de la aplicación Usuarios.
 
-Contiene las pruebas automatizadas (Django Test Framework) de
-RegistroAcceso: que un login exitoso, un login fallido y un
-acceso denegado (403) efectivamente generen su registro, con
-los datos esperados y sin exponer la contraseña ingresada.
+Contiene las pruebas automatizadas (Django Test Framework) de:
+
+- RegistroAcceso: que un login exitoso, un login fallido y un
+  acceso denegado (403) efectivamente generen su registro, con
+  los datos esperados y sin exponer la contraseña ingresada.
+- La expiración de sesión por inactividad (SESSION_COOKIE_AGE/
+  SESSION_SAVE_EVERY_REQUEST, ver config/settings.py).
 
 No se prueban aquí los flujos de alta/edición de usuarios
 (UsuarioCreateView/UsuarioUpdateView) ni el control de acceso
@@ -24,9 +27,14 @@ al finalizar.
 # IMPORTACIONES
 # =====================================================
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import RegistroAcceso, RolUsuario, TipoEventoAcceso
 
@@ -233,6 +241,155 @@ class AccesoDenegadoRegistroAccesoTests(TestCase):
         respuesta = self.client.get(reverse("lista_competencias"))
 
         self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(
+            RegistroAcceso.objects.filter(
+                tipoEvento=TipoEventoAcceso.ACCESO_DENEGADO
+            ).count(),
+            0,
+        )
+
+
+# =====================================================
+# 4. EXPIRACIÓN DE SESIÓN POR INACTIVIDAD
+# =====================================================
+
+class ExpiracionSesionPorInactividadTests(TestCase):
+    """
+    Pruebas de SESSION_COOKIE_AGE/SESSION_SAVE_EVERY_REQUEST
+    (ver config/settings.py): sesión de 15 minutos con ventana
+    deslizante por actividad.
+
+    No usan ningún mock de tiempo (freezegun ni similar):
+    manipulan directamente Session.expire_date -el modelo real
+    que respalda el backend de sesiones por defecto,
+    django.contrib.sessions.backends.db, ya en uso por el
+    proyecto- para simular de forma determinista "hace poco que
+    no hay actividad" o "ya pasaron los 15 minutos", sin
+    depender de esperas reales ni de dependencias nuevas.
+
+    Usa dashboard.views.inicio (name="inicio") como vista
+    protegida de prueba: es la única vista con @login_required
+    sin exigir además un rol -el resto de las vistas protegidas
+    del sistema son de Configuración y exigen rol Administrador
+    (solo_administrador), lo que mezclaría permisos con lo que
+    esta clase prueba-.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="expiracion_sesion",
+            email="expiracion_sesion@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Expiracion Sesion",
+            rol=RolUsuario.USUARIO,
+        )
+
+    def _expireDateDeLaSesionActual(self):
+        return Session.objects.get(
+            session_key=self.client.session.session_key
+        ).expire_date
+
+    # -------------------------------------------------
+    # CONFIGURACIÓN
+    # -------------------------------------------------
+
+    def test_configuracion_de_sesion_es_15_minutos_con_renovacion(self):
+        """
+        Sanity check de los dos settings que implementan el
+        requisito: si alguno de los dos se revierte por error,
+        esta prueba lo detecta antes que cualquier otra.
+        """
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 900)
+        self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
+
+    # -------------------------------------------------
+    # RENOVACIÓN POR ACTIVIDAD
+    # -------------------------------------------------
+
+    def test_una_request_autenticada_renueva_la_ventana_de_15_minutos(self):
+        """
+        Adelanta artificialmente expire_date a solo 5 minutos en
+        el futuro (simulando que ya pasaron 10 de los 15 minutos
+        permitidos) y hace una request autenticada:
+        SESSION_SAVE_EVERY_REQUEST=True debe reescribir la
+        sesión con una ventana COMPLETA de 15 minutos desde ese
+        momento, no seguir contando desde el valor anterior.
+        """
+        self.client.login(
+            username=self.usuario.email, password="ClaveSegura123"
+        )
+
+        sesion = Session.objects.get(
+            session_key=self.client.session.session_key
+        )
+        sesion.expire_date = timezone.now() + timedelta(minutes=5)
+        sesion.save()
+
+        respuesta = self.client.get(reverse("inicio"))
+        self.assertEqual(respuesta.status_code, 200)
+
+        nuevoExpireDate = self._expireDateDeLaSesionActual()
+
+        # Si la ventana se hubiera seguido contando desde el
+        # valor viejo, seguiría a ~5 minutos de "ahora". Al
+        # renovarse, queda a ~15 minutos: la diferencia es de
+        # varios minutos, no de milisegundos.
+        self.assertGreater(
+            nuevoExpireDate - timezone.now(), timedelta(minutes=10)
+        )
+
+    # -------------------------------------------------
+    # EXPIRACIÓN
+    # -------------------------------------------------
+
+    def test_sesion_expirada_desautentica_y_redirige_al_login(self):
+        """
+        Con expire_date ya en el pasado (15+ minutos de
+        inactividad ya transcurridos), la siguiente request a
+        una vista protegida debe tratar al usuario como anónimo
+        -sin llamar a ningún logout explícito, es el
+        comportamiento nativo del backend de sesiones- y
+        redirigir a LOGIN_URL, igual que con cualquier usuario
+        no autenticado.
+        """
+        self.client.login(
+            username=self.usuario.email, password="ClaveSegura123"
+        )
+
+        sesion = Session.objects.get(
+            session_key=self.client.session.session_key
+        )
+        sesion.expire_date = timezone.now() - timedelta(minutes=1)
+        sesion.save()
+
+        respuesta = self.client.get(reverse("inicio"))
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn(reverse("login"), respuesta.url)
+        self.assertFalse(respuesta.wsgi_request.user.is_authenticated)
+
+    def test_sesion_expirada_no_genera_acceso_denegado(self):
+        """
+        Decisión ya tomada para RegistroAcceso: los redirects a
+        login por falta de sesión no son un "acceso denegado"
+        (ver RegistroAccesoMiddleware). Una sesión expirada es,
+        para el sistema, indistinguible de un usuario que nunca
+        inició sesión: no debe generar ningún RegistroAcceso
+        nuevo.
+        """
+        self.client.login(
+            username=self.usuario.email, password="ClaveSegura123"
+        )
+        RegistroAcceso.objects.all().delete()
+
+        sesion = Session.objects.get(
+            session_key=self.client.session.session_key
+        )
+        sesion.expire_date = timezone.now() - timedelta(minutes=1)
+        sesion.save()
+
+        self.client.get(reverse("inicio"))
+
         self.assertEqual(
             RegistroAcceso.objects.filter(
                 tipoEvento=TipoEventoAcceso.ACCESO_DENEGADO

@@ -214,6 +214,35 @@ LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/usuarios/login/"
 
 # =====================================================
+# CIERRE DE SESIÓN POR INACTIVIDAD
+# =====================================================
+
+# Tiempo de vida de la sesión, en segundos, contado desde su
+# último guardado. Con SESSION_SAVE_EVERY_REQUEST=True (más
+# abajo), Django reescribe la sesión -y por lo tanto recalcula
+# esta expiración desde "ahora"- en cada request donde se
+# accede a request.session, lo que en la práctica ocurre en
+# cualquier vista protegida (@login_required/LoginRequiredMixin
+# ya evalúan request.user, que internamente lee la sesión). El
+# efecto es una ventana deslizante: 15 minutos sin ninguna
+# request autenticada expiran la sesión; cualquier actividad
+# dentro de esos 15 minutos la renueva.
+SESSION_COOKIE_AGE = 900
+
+# Sin esto, Django solo reescribe la sesión cuando su contenido
+# cambia (por ejemplo, al iniciar sesión), y SESSION_COOKIE_AGE
+# se contaría desde ese único momento, no desde la última
+# actividad. Con True, la expiración se recalcula en cada
+# request, logrando el comportamiento por inactividad pedido.
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Al expirar, Django trata la sesión como inexistente en la
+# siguiente request (sin ninguna vista ni middleware adicional):
+# request.user pasa a AnonymousUser, y @login_required/
+# LoginRequiredMixin redirigen a LOGIN_URL igual que con
+# cualquier usuario no autenticado.
+
+# =====================================================
 # MENSAJES DEL SISTEMA
 # =====================================================
 
