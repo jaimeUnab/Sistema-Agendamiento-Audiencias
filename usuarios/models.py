@@ -109,3 +109,131 @@ class Usuario(AbstractUser):
             self.username = self.email
 
         super().save(*args, **kwargs)
+
+
+# =====================================================
+# REGISTRO DE ACCESO
+# =====================================================
+
+class TipoEventoAcceso(models.TextChoices):
+    """
+    Define los tipos de evento que RegistroAcceso puede
+    registrar.
+    """
+
+    LOGIN_EXITOSO = "LOGIN_EXITOSO", "Login exitoso"
+    LOGIN_FALLIDO = "LOGIN_FALLIDO", "Login fallido"
+    LOGOUT = "LOGOUT", "Logout"
+    ACCESO_DENEGADO = "ACCESO_DENEGADO", "Acceso denegado"
+
+
+class RegistroAcceso(models.Model):
+    """
+    Audita un evento de acceso al sistema: login (exitoso o
+    fallido), logout, o acceso denegado a una sección
+    restringida por rol.
+
+    Es independiente de RegistroTrazabilidad
+    (audiencias/models.py): ese modelo audita operaciones de
+    negocio sobre una Audiencia; este audita quién entró,
+    quién intentó entrar sin éxito y quién intentó acceder a
+    una sección sin el permiso requerido. Ninguno de los dos
+    reemplaza ni modifica al otro.
+
+    Solo define la estructura de datos: el servicio que
+    efectivamente crea estos registros (ServicioRegistroAcceso)
+    vive en usuarios/services.py.
+    """
+
+    # Usuario del sistema asociado al evento. Nulo en un login
+    # fallido cuyo nombre de usuario no corresponde a ningún
+    # Usuario existente -no siempre es posible identificar a
+    # quién intentó acceder-. on_delete=SET_NULL: si el
+    # Usuario se elimina más adelante, el registro histórico
+    # de acceso no debe perderse.
+    usuario = models.ForeignKey(
+        Usuario,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="registrosAcceso",
+        verbose_name="Usuario",
+    )
+
+    # Nombre de usuario (correo, ver USERNAME_FIELD más arriba)
+    # asociado al intento, tal como se ingresó o se resolvió.
+    # Se completa en TODOS los eventos, no solo cuando
+    # "usuario" es None: permite reconstruir con qué credencial
+    # se accedió incluso cuando sí existe un Usuario asociado.
+    nombreUsuarioIntentado = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Nombre de usuario intentado",
+    )
+
+    # Tipo de evento registrado.
+    tipoEvento = models.CharField(
+        max_length=20,
+        choices=TipoEventoAcceso.choices,
+        verbose_name="Tipo de evento",
+    )
+
+    # Indica si el evento representa un acceso concedido
+    # (LOGIN_EXITOSO, LOGOUT) o denegado (LOGIN_FALLIDO,
+    # ACCESO_DENEGADO). Se guarda como campo propio -en vez de
+    # derivarlo de "tipoEvento" al leer- para que quede
+    # filtrable directamente desde el panel de administración
+    # (ver usuarios/admin.py).
+    exitoso = models.BooleanField(
+        verbose_name="Exitoso",
+    )
+
+    # Fecha y hora del evento. auto_now_add la asigna una única
+    # vez, al crear el registro (mismo criterio que
+    # RegistroTrazabilidad.fechaHora en audiencias/models.py).
+    fechaHora = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha y hora",
+    )
+
+    # Dirección IP desde la que ocurrió el evento (ver
+    # ServicioRegistroAcceso._obtenerIp). Nula solo si no hay
+    # objeto request disponible, caso que no debería darse en
+    # la práctica.
+    direccionIp = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="Dirección IP",
+    )
+
+    # Ruta solicitada que produjo un ACCESO_DENEGADO. Queda en
+    # blanco para el resto de los eventos: login/logout no
+    # tienen una "ruta denegada" asociada.
+    rutaSolicitada = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Ruta solicitada",
+    )
+
+    # =================================================
+    # CONFIGURACIÓN
+    # =================================================
+
+    class Meta:
+        # Ordena del evento más reciente al más antiguo, el
+        # orden natural para revisar un historial de accesos.
+        ordering = ["-fechaHora"]
+
+        verbose_name = "Registro de acceso"
+        verbose_name_plural = "Registros de acceso"
+
+    def __str__(self):
+        """
+        Devuelve "TipoEvento - nombreUsuarioIntentado -
+        FechaHora", por ejemplo:
+        "Login fallido - jasalas1@pjud.cl - 2026-09-03 10:15".
+        """
+        return (
+            f"{self.get_tipoEvento_display()} - "
+            f"{self.nombreUsuarioIntentado} - {self.fechaHora}"
+        )

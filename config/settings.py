@@ -78,6 +78,10 @@ MIDDLEWARE = [
     # Protección contra Clickjacking
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
+    # Registro de accesos denegados (403) en RegistroAcceso.
+    # Ver usuarios/middleware.py.
+    'usuarios.middleware.RegistroAccesoMiddleware',
+
 ]
 
 
