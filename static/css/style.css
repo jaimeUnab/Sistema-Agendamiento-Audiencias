@@ -925,7 +925,29 @@ a{
 
 
 /*
+    Contenedor de texto (nombre + cargo) dentro de ".top-user".
+    Sin clase propia en el HTML -es el único <div> hijo de
+    ".top-user", ver templates/base_dashboard.html-, así que se
+    apunta directamente con el combinador de hijo, sin tocar el
+    HTML. line-height reducido para acercar "Administrador" a
+    "jaime salas" (antes quedaban separados por el interlineado
+    por defecto del navegador).
+*/
+.top-user > div{
+
+    line-height:1.05;
+
+}
+
+
+/*
     Nombre del usuario.
+
+    Mismo tamaño, peso y color que ".top-user small" (más abajo),
+    para que ambas líneas sean tipográficamente idénticas. Tamaño
+    agrandado a 16px (antes 15px original, luego 13px) y negrita
+    explícita (antes negrita "por defecto" del navegador, sin
+    declararlo).
 */
 .top-user strong{
 
@@ -933,19 +955,28 @@ a{
 
     color:#1f2937;
 
-    font-size:15px;
+    font-size:16px;
+
+    font-weight:700;
 
 }
 
 
 /*
     Cargo del usuario.
+
+    Misma letra que ".top-user strong" (ver su comentario arriba):
+    mismo tamaño (16px), mismo peso (700) y mismo color (#1f2937).
+    Antes tenía su propio gris más claro y tamaño menor, sin
+    negrita.
 */
 .top-user small{
 
-    color:#6b7280;
+    color:#1f2937;
 
-    font-size:12px;
+    font-size:16px;
+
+    font-weight:700;
 
 }
 
