@@ -37,6 +37,54 @@ Causas
 
                 </div>
 
+                <!-- ========================================= -->
+                <!--   FILTROS: RIT + COMPETENCIA               -->
+                <!-- ========================================= -->
+                <!-- method="get": esta pantalla es solo de consulta/lectura,
+                     no modifica nada, por lo que RIT y Competencia viajan
+                     como parámetros de consulta (?rit=...&competencia=<id>)
+                     y no como POST -mismo criterio que agenda_diaria/
+                     agenda_semanal-. Esto permite que la URL con un filtro
+                     específico se pueda volver a abrir o compartir
+                     directamente, y que el filtro se mantenga al recargar
+                     la página. Ambos filtros son opcionales y se combinan
+                     entre sí (ver lista_causas en causas/views.py); sin
+                     ninguno de los dos, se muestran todas las causas,
+                     igual que antes de este cambio. -->
+                <form method="get" class="row g-3 align-items-end mb-3">
+
+                    <div class="col-auto">
+                        <label for="id_rit" class="form-label">RIT</label>
+                        <input type="text"
+                               id="id_rit"
+                               name="rit"
+                               value="{{ rit_buscado }}"
+                               class="form-control"
+                               placeholder="Ej: C-10">
+                    </div>
+
+                    <div class="col-auto">
+                        <label for="id_competencia" class="form-label">Competencia</label>
+                        <select id="id_competencia" name="competencia" class="form-select">
+                            <option value="" {% if not competencia_seleccionada %}selected{% endif %}>
+                                Todas
+                            </option>
+                            {% for competencia in competencias %}
+                            <option value="{{ competencia.pk }}" {% if competencia_seleccionada.pk == competencia.pk %}selected{% endif %}>
+                                {{ competencia.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-outline-primary">
+                            Buscar
+                        </button>
+                    </div>
+
+                </form>
+
                 <hr>
 
                 <!-- Catálogo de solo lectura: muestra RIT, RUC,
@@ -65,12 +113,21 @@ Causas
                                 <td>{{ causa.competencia.nombre }}</td>
                             </tr>
                             {% empty %}
-                            <!-- Mensaje mostrado cuando no existen causas registradas -->
+                            <!-- Mensaje mostrado cuando no hay causas que mostrar:
+                                 distingue "no existe ninguna causa cargada" de
+                                 "ninguna coincide con el filtro aplicado" -mismo
+                                 criterio que "mensaje_sin_audiencias" en
+                                 agenda_diaria (audiencias/views.py)-. -->
                             <tr>
                                 <td colspan="4" class="text-center">
-                                    No existen causas registradas. Usa
-                                    "Importar desde Excel" para cargar las
-                                    primeras.
+                                    {% if hay_filtros_activos %}
+                                        No se encontraron causas que coincidan con
+                                        los filtros seleccionados.
+                                    {% else %}
+                                        No existen causas registradas. Usa
+                                        "Importar desde Excel" para cargar las
+                                        primeras.
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

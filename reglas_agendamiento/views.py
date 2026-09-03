@@ -26,6 +26,11 @@ administra su contenido.
 # IMPORTACIONES
 # =====================================================
 
+# Valores de respaldo para la primera vez que se abre "Configuración
+# General" sin que exista todavía ninguna fila de
+# ConfiguracionAgendamiento (ver configuracion_general más abajo).
+import datetime
+
 # Decorador que restringe el acceso únicamente a usuarios autenticados.
 from django.contrib.auth.decorators import login_required
 
@@ -93,21 +98,34 @@ from .models import DiaAtencion, DiaSemana, ReglaAgendamiento
 @solo_administrador
 def configuracion_general(request):
     """
-    Muestra y permite editar la configuración general de
-    agendamiento (jornada de atención, duración de bloque,
-    horizonte de búsqueda), y muestra -de solo lectura- el
-    catálogo de salas.
+    Muestra y permite editar el horizonte de búsqueda de fechas
+    para la programación automática de audiencias, y muestra -de
+    solo lectura- el catálogo de salas.
 
     ConfiguracionAgendamiento es un singleton (una única
     instancia posible, garantizada a nivel de base de datos por
     su campo "claveUnica"): esta vista busca esa instancia con
     ConfiguracionAgendamiento.objects.first() y se la pasa como
-    "instance" al formulario. Si todavía no existe ninguna
-    (nunca se guardó una), "instance" queda en None y
-    form.save() simplemente crea la primera -y única- instancia;
-    no se inventan valores por defecto para los campos que no
-    los tienen en el modelo, es el propio formulario quien
-    exige completarlos.
+    "instance" al formulario.
+
+    ConfiguracionAgendamientoForm solo expone "horizonteBusquedaDias"
+    (ver su docstring en reglas_agendamiento/forms.py): "horaInicioJornada",
+    "horaTerminoJornada" y "duracionBloque" siguen siendo campos reales
+    del modelo, sin valor por defecto (no null=True, sin default=), así
+    que si todavía no existe ninguna fila (instalación nueva) no se le
+    puede pasar "instance=None" al formulario tal cual: como esos tres
+    campos no viajan en el formulario, Django intentaría crear la
+    primera fila sin ellos y la base de datos rechazaría el INSERT
+    (columnas NOT NULL en NULL). Por eso, únicamente en ese caso, se
+    arma de antemano una instancia SIN GUARDAR con valores de respaldo
+    para esos tres campos (08:00, 14:00 y 30 minutos: los mismos valores
+    con los que ya se viene usando el sistema) y se la entrega como
+    "instance" al formulario. No se guarda nada todavía en este punto:
+    el propio formulario sigue siendo quien exige completar
+    "horizonteBusquedaDias" y quien decide, al validar y guardar, si
+    finalmente se crea la fila -con esos tres valores de respaldo más
+    el horizonte que se haya ingresado-. Si ya existe una fila, esto no
+    se ejecuta y sus valores no se tocan.
 
     La sección de Salas es de solo lectura: no se reimplementa
     su alta/edición/activación aquí (eso ya existe, completo y
@@ -118,6 +136,13 @@ def configuracion_general(request):
     """
 
     configuracion = ConfiguracionAgendamiento.objects.first()
+
+    if configuracion is None:
+        configuracion = ConfiguracionAgendamiento(
+            horaInicioJornada=datetime.time(8, 0),
+            horaTerminoJornada=datetime.time(14, 0),
+            duracionBloque=30,
+        )
 
     if request.method == "POST":
         form = ConfiguracionAgendamientoForm(request.POST, instance=configuracion)

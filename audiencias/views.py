@@ -156,6 +156,31 @@ def _resolver_causa(competencia, rit):
     return coincidencias.first(), None
 
 
+def _resolver_id_numerico(valor_texto):
+    """
+    Convierte un valor recibido de request.POST (texto) a un
+    entero válido para usarlo como pk en una consulta al ORM, o a
+    None si está vacío/ausente o no es un entero válido.
+
+    Existe porque Modelo.objects.filter(pk="") o
+    Modelo.objects.filter(pk="abc") lanzan ValueError ("Field 'id'
+    expected a number but got ...") en vez de simplemente no
+    encontrar nada -a diferencia de Modelo.objects.filter(pk=None),
+    que sí devuelve un queryset vacío sin lanzar ninguna excepción-.
+    Se usa en cualquier punto donde un ID llega desde el formulario
+    y todavía podría estar vacío o manipulado con un valor no
+    numérico, para que nunca llegue "tal cual" a un .filter(pk=...).
+    """
+
+    if not valor_texto:
+        return None
+
+    try:
+        return int(valor_texto)
+    except (TypeError, ValueError):
+        return None
+
+
 # =====================================================
 # REGISTRO DE AUDIENCIA
 # =====================================================
@@ -392,6 +417,21 @@ def proponer_fechas_audiencia(request):
     el generador lanza ValueError, que aquí se captura y se
     muestra como error, sin cambiar de sala automáticamente.
 
+    Campos realmente obligatorios para esta vista, según lo que
+    GeneradorPropuestaFecha exige para construirse: causa (vía
+    competencia+rit), tipoAudiencia, sala y cantidadBloques. NO
+    incluye "fecha" ni "bloqueInicio" -esta vista no los lee ni
+    los usa en ningún momento (ver más arriba: "fecha" y
+    "bloqueInicio" todavía no existen en este paso)-. Si falta
+    alguno de los cuatro obligatorios, o si "competencia"/
+    "tipoAudiencia"/"sala" llegan vacíos o con un valor no
+    numérico, se informa con un mensaje específico de cuál falta
+    -mediante el framework de mensajes ya usado en todo el
+    proyecto- y se vuelve a mostrar el mismo formulario,
+    conservando lo ya ingresado. En ningún caso se llega a
+    ejecutar una consulta al ORM con un ID vacío o no numérico
+    (ver _resolver_id_numerico).
+
     Solo los usuarios autenticados pueden acceder a esta
     vista.
     """
@@ -408,7 +448,7 @@ def proponer_fechas_audiencia(request):
     form = AudienciaForm(request.POST)
 
     competencia = Competencia.objects.filter(
-        pk=request.POST.get("competencia")
+        pk=_resolver_id_numerico(request.POST.get("competencia"))
     ).first()
     rit = (request.POST.get("rit") or "").strip()
 
@@ -418,17 +458,65 @@ def proponer_fechas_audiencia(request):
         messages.error(request, error)
         return render(request, "audiencias/formulario.html", {"form": form})
 
-    tipo_audiencia = TipoAudiencia.objects.filter(
-        pk=request.POST.get("tipoAudiencia")
-    ).first()
-    sala = Sala.objects.filter(pk=request.POST.get("sala")).first()
-    cantidad_bloques_raw = request.POST.get("cantidadBloques")
+    # -------------------------------------------------
+    # "tipoAudiencia": obligatorio para esta vista (ver
+    # docstring). Se resuelve primero a un entero seguro
+    # (_resolver_id_numerico): un valor vacío o no numérico
+    # nunca llega a TipoAudiencia.objects.filter(pk=...), que
+    # lanzaría ValueError.
+    # -------------------------------------------------
 
-    if not (tipo_audiencia and sala and cantidad_bloques_raw):
+    tipoAudiencia_id = _resolver_id_numerico(request.POST.get("tipoAudiencia"))
+    tipo_audiencia = (
+        TipoAudiencia.objects.filter(pk=tipoAudiencia_id).first()
+        if tipoAudiencia_id else None
+    )
+
+    if not tipo_audiencia:
         messages.error(
             request,
-            "Selecciona tipo de audiencia, sala y cantidad de bloques "
-            "antes de solicitar propuestas."
+            "Debe seleccionar un tipo de audiencia antes de solicitar "
+            "propuestas de fechas."
+        )
+        return render(
+            request,
+            "audiencias/formulario.html",
+            {"form": form, "causa_encontrada": causa}
+        )
+
+    # -------------------------------------------------
+    # "sala": mismo criterio que "tipoAudiencia".
+    # -------------------------------------------------
+
+    sala_id = _resolver_id_numerico(request.POST.get("sala"))
+    sala = Sala.objects.filter(pk=sala_id).first() if sala_id else None
+
+    if not sala:
+        messages.error(
+            request,
+            "Debe seleccionar una sala antes de solicitar propuestas "
+            "de fechas."
+        )
+        return render(
+            request,
+            "audiencias/formulario.html",
+            {"form": form, "causa_encontrada": causa}
+        )
+
+    # -------------------------------------------------
+    # "cantidadBloques": no es un ID/pk, así que no necesita
+    # _resolver_id_numerico -se distingue "ausente" (mensaje
+    # específico nuevo) de "presente pero no numérico" (mensaje
+    # ya existente, sin cambios)-.
+    # -------------------------------------------------
+
+    cantidad_bloques_raw = (request.POST.get("cantidadBloques") or "").strip()
+
+    if not cantidad_bloques_raw:
+        messages.error(
+            request,
+            "Debe indicar la cantidad de bloques antes de solicitar "
+            "propuestas de fechas."
         )
         return render(
             request,
@@ -514,8 +602,25 @@ def ver_disponibilidad_audiencia(request):
     información para decidir con criterio.
 
     Requiere que "sala" y "fecha" ya estén completados en el
-    formulario (no requiere causa ni el resto de los campos,
-    que pueden seguir vacíos a propósito).
+    formulario -son los ÚNICOS dos campos realmente obligatorios
+    para esta vista: son los únicos que participan en la consulta
+    central de Audiencia (más abajo). "competencia", "rit",
+    "tipoAudiencia", "bloqueInicio" y "cantidadBloques" siguen
+    siendo opcionales por diseño (solo alimentan la previsualización
+    "Seleccionado", ver más abajo): si faltan, o llegan con un
+    valor no numérico en el caso de los IDs, esta vista igual
+    responde con normalidad, simplemente sin esa previsualización.
+
+    Si falta "sala" o "fecha" (o "sala" llega vacía, o con un
+    valor no numérico, o con un ID que no corresponde a ninguna
+    Sala real), se informa con un mensaje específico de cuál de
+    los dos falta -mediante el framework de mensajes ya usado en
+    todo el proyecto- y se vuelve a mostrar el mismo formulario,
+    conservando todo lo que el usuario ya había ingresado (el
+    "form" que se pasa al render está construido con
+    request.POST completo, no uno vacío). En ningún caso se
+    llega a ejecutar una consulta al ORM con un ID vacío o no
+    numérico (ver _resolver_id_numerico).
 
     Solo los usuarios autenticados pueden acceder a esta
     vista.
@@ -526,26 +631,60 @@ def ver_disponibilidad_audiencia(request):
 
     form = AudienciaForm(request.POST)
 
-    sala = Sala.objects.filter(pk=request.POST.get("sala")).first()
-    fecha = request.POST.get("fecha")
-
     # -------------------------------------------------
     # Conserva la causa ya encontrada, si competencia+rit
     # siguen presentes en esta misma solicitud (misma función
     # de búsqueda que usan los otros dos flujos, sin repetirla).
+    # Ninguno de los dos es obligatorio para esta vista: si
+    # faltan, o "competencia" llega vacía/no numérica,
+    # _resolver_id_numerico/_resolver_causa ya devuelven
+    # causa_encontrada=None sin lanzar ninguna excepción.
     # -------------------------------------------------
 
     competencia = Competencia.objects.filter(
-        pk=request.POST.get("competencia")
+        pk=_resolver_id_numerico(request.POST.get("competencia"))
     ).first()
     rit = (request.POST.get("rit") or "").strip()
     causa_encontrada, _error_causa = _resolver_causa(competencia, rit)
 
-    if not (sala and fecha):
+    # -------------------------------------------------
+    # "sala": único campo, junto con "fecha", realmente
+    # obligatorio para esta vista (ver docstring). Se resuelve
+    # primero a un entero seguro (_resolver_id_numerico): un
+    # valor vacío o no numérico nunca llega a
+    # Sala.objects.filter(pk=...), que lanzaría ValueError. Una
+    # sala numérica pero inexistente cae en el mismo mensaje: en
+    # los tres casos (vacía, no numérica, inexistente) el usuario
+    # no tiene, en los hechos, una sala válida seleccionada.
+    # -------------------------------------------------
+
+    sala_id = _resolver_id_numerico(request.POST.get("sala"))
+    sala = Sala.objects.filter(pk=sala_id).first() if sala_id else None
+
+    if not sala:
         messages.error(
             request,
-            "Selecciona una sala y una fecha para ver la disponibilidad "
-            "de agenda."
+            "Debe seleccionar una sala antes de buscar disponibilidad."
+        )
+        return render(
+            request,
+            "audiencias/formulario.html",
+            {"form": form, "causa_encontrada": causa_encontrada}
+        )
+
+    # -------------------------------------------------
+    # "fecha": el otro campo obligatorio. No se usa como pk (es
+    # un string "AAAA-MM-DD", no un ID), así que no necesita
+    # _resolver_id_numerico -alcanza con comprobar que no esté
+    # vacía-.
+    # -------------------------------------------------
+
+    fecha = (request.POST.get("fecha") or "").strip()
+
+    if not fecha:
+        messages.error(
+            request,
+            "Debe seleccionar una fecha antes de buscar disponibilidad."
         )
         return render(
             request,
@@ -609,23 +748,27 @@ def ver_disponibilidad_audiencia(request):
     # "Ver disponibilidad" tiene formnovalidate: es normal que el
     # funcionario lo presione antes de haber elegido tipoAudiencia/
     # bloqueInicio/cantidadBloques todavía. En ese caso llegan como
-    # cadena vacía "" (no ausentes), y un id vacío no es un id
-    # válido para consultar por pk -.filter(pk="") lanza ValueError
-    # en un campo numérico, a diferencia de pk=None, que
-    # simplemente no encuentra nada-. Por eso se comprueba primero
-    # que el valor no esté vacío antes de consultar.
+    # cadena vacía "" (no ausentes) -o, si el envío llegara
+    # manipulado, con un valor no numérico-, y ninguno de los dos
+    # es un id válido para consultar por pk (.filter(pk="") o
+    # .filter(pk="abc") lanzan ValueError en un campo numérico, a
+    # diferencia de pk=None, que simplemente no encuentra nada).
+    # _resolver_id_numerico ya deja ambos casos como None, así que
+    # no hace falta comprobar "si está vacío" aparte: ninguno de
+    # los dos campos es obligatorio en esta vista (ver docstring
+    # de ver_disponibilidad_audiencia), así que un valor ausente o
+    # inválido simplemente no arma la previsualización, sin
+    # bloquear nada.
 
-    tipoAudiencia_id = request.POST.get("tipoAudiencia")
-    tipo_audiencia_seleccionado = (
-        TipoAudiencia.objects.filter(pk=tipoAudiencia_id).first()
-        if tipoAudiencia_id else None
-    )
+    tipoAudiencia_id = _resolver_id_numerico(request.POST.get("tipoAudiencia"))
+    tipo_audiencia_seleccionado = TipoAudiencia.objects.filter(
+        pk=tipoAudiencia_id
+    ).first()
 
-    bloqueInicio_id = request.POST.get("bloqueInicio")
-    bloque_inicio_seleccionado = (
-        BloqueHorario.objects.filter(pk=bloqueInicio_id).first()
-        if bloqueInicio_id else None
-    )
+    bloqueInicio_id = _resolver_id_numerico(request.POST.get("bloqueInicio"))
+    bloque_inicio_seleccionado = BloqueHorario.objects.filter(
+        pk=bloqueInicio_id
+    ).first()
 
     try:
         cantidad_bloques_seleccionada = int(request.POST.get("cantidadBloques"))
@@ -854,6 +997,7 @@ def agenda_diaria(request):
         audiencias = list(
             Audiencia.objects.filter(**filtro_audiencias).select_related(
                 "causa",
+                "causa__competencia",
                 "tipoAudiencia",
                 "bloqueInicio",
             ).order_by("bloqueInicio__orden")
@@ -1051,6 +1195,7 @@ def agenda_semanal(request):
             **filtro_audiencias
         ).select_related(
             "causa",
+            "causa__competencia",
             "tipoAudiencia",
             "bloqueInicio",
         ).order_by("fecha", "bloqueInicio__orden")

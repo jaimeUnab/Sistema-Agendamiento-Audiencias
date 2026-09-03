@@ -288,6 +288,120 @@ class FlujoCompletoRegistroAudienciaIntegrationTests(TestCase):
         self.assertEqual(Audiencia.objects.count(), 0)
         self.assertFalse(respuesta.context.get("requiere_confirmacion"))
 
+    # -------------------------------------------------
+    # ver_disponibilidad_audiencia: sala/fecha vacías o con un ID
+    # no numérico no deben producir un ValueError (bug real
+    # corregido), sino un mensaje amigable y específico, sin
+    # ejecutar ninguna consulta de disponibilidad, conservando lo
+    # que el usuario ya había ingresado en el formulario.
+    # -------------------------------------------------
+
+    def test_disponibilidad_sin_sala_muestra_mensaje_sin_excepcion(self):
+        datos = {
+            "competencia": self.competencia.pk,
+            "rit": self.causa.rit,
+            "tipoAudiencia": self.tipo_audiencia.pk,
+            "sala": "",
+            "fecha": "2027-04-01",
+            "cantidadBloques": 1,
+            "bloqueInicio": self.bloque.pk,
+        }
+
+        respuesta = self.client.post(reverse("ver_disponibilidad_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "audiencias/formulario.html")
+
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar una sala antes de buscar disponibilidad.",
+            mensajes,
+        )
+
+        # No se llegó a ejecutar la consulta de disponibilidad.
+        self.assertNotIn("disponibilidad", respuesta.context)
+
+        # El formulario conserva lo que el usuario ya había ingresado
+        # (no se perdió el RIT ni el tipo de audiencia ya elegidos).
+        self.assertEqual(respuesta.context["form"].data.get("rit"), self.causa.rit)
+        self.assertEqual(
+            respuesta.context["form"].data.get("tipoAudiencia"),
+            str(self.tipo_audiencia.pk),
+        )
+
+    def test_disponibilidad_sin_fecha_muestra_mensaje_sin_excepcion(self):
+        datos = {
+            "competencia": self.competencia.pk,
+            "rit": self.causa.rit,
+            "tipoAudiencia": self.tipo_audiencia.pk,
+            "sala": self.sala.pk,
+            "fecha": "",
+            "cantidadBloques": 1,
+            "bloqueInicio": self.bloque.pk,
+        }
+
+        respuesta = self.client.post(reverse("ver_disponibilidad_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "audiencias/formulario.html")
+
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar una fecha antes de buscar disponibilidad.",
+            mensajes,
+        )
+        self.assertNotIn("disponibilidad", respuesta.context)
+        self.assertEqual(respuesta.context["form"].data.get("rit"), self.causa.rit)
+
+    def test_disponibilidad_sala_no_numerica_muestra_mensaje_sin_excepcion(self):
+        datos = {
+            "competencia": self.competencia.pk,
+            "rit": self.causa.rit,
+            "tipoAudiencia": self.tipo_audiencia.pk,
+            "sala": "abc",
+            "fecha": "2027-04-01",
+            "cantidadBloques": 1,
+            "bloqueInicio": self.bloque.pk,
+        }
+
+        respuesta = self.client.post(reverse("ver_disponibilidad_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "audiencias/formulario.html")
+
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar una sala antes de buscar disponibilidad.",
+            mensajes,
+        )
+        self.assertNotIn("disponibilidad", respuesta.context)
+
+    def test_disponibilidad_tipo_audiencia_no_numerico_no_bloquea(self):
+        """
+        tipoAudiencia sigue siendo opcional en esta vista: un valor
+        no numérico ya no debe lanzar ValueError (antes de esta
+        corrección, un id no numérico rompía igual que uno vacío),
+        pero tampoco debe bloquear la consulta -sala y fecha son
+        válidas, así que la tabla de disponibilidad debe mostrarse
+        con normalidad, simplemente sin la previsualización
+        "Seleccionado".
+        """
+        datos = {
+            "competencia": self.competencia.pk,
+            "rit": self.causa.rit,
+            "tipoAudiencia": "abc",
+            "sala": self.sala.pk,
+            "fecha": "2027-04-01",
+            "cantidadBloques": 1,
+            "bloqueInicio": self.bloque.pk,
+        }
+
+        respuesta = self.client.post(reverse("ver_disponibilidad_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("disponibilidad", respuesta.context)
+        self.assertIsNone(respuesta.context["tipo_audiencia_seleccionado"])
+
 
 # =====================================================
 # CONSULTA DE AGENDA
@@ -1112,6 +1226,137 @@ class ProponerFechasIntegrationTests(TestCase):
         )
 
         self.assertEqual(respuesta.status_code, 200)
+        self.assertNotIn("propuestas", respuesta.context)
+
+    # -------------------------------------------------
+    # proponer_fechas_audiencia: competencia/tipoAudiencia/sala
+    # vacíos o con un ID no numérico, y cantidadBloques ausente o
+    # no numérica, no deben producir un ValueError (bug real
+    # corregido), sino un mensaje amigable y específico, sin
+    # ejecutar GeneradorPropuestaFecha, conservando lo ya
+    # ingresado por el usuario.
+    # -------------------------------------------------
+
+    def _datos_validos(self):
+        return {
+            "competencia": self.competencia.pk,
+            "rit": self.causa.rit,
+            "tipoAudiencia": self.tipo_audiencia.pk,
+            "sala": self.sala.pk,
+            "cantidadBloques": 1,
+        }
+
+    def test_proponer_sin_competencia_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["competencia"] = ""
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Selecciona una competencia e ingresa un RIT para buscar la causa.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_competencia_no_numerica_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["competencia"] = "abc"
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Selecciona una competencia e ingresa un RIT para buscar la causa.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_sin_tipo_audiencia_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["tipoAudiencia"] = ""
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar un tipo de audiencia antes de solicitar "
+            "propuestas de fechas.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+        self.assertEqual(respuesta.context["form"].data.get("rit"), self.causa.rit)
+
+    def test_proponer_tipo_audiencia_no_numerico_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["tipoAudiencia"] = "abc"
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar un tipo de audiencia antes de solicitar "
+            "propuestas de fechas.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_sin_sala_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["sala"] = ""
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar una sala antes de solicitar propuestas de fechas.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_sala_no_numerica_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["sala"] = "abc"
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe seleccionar una sala antes de solicitar propuestas de fechas.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_sin_cantidad_bloques_muestra_mensaje_sin_excepcion(self):
+        datos = self._datos_validos()
+        datos["cantidadBloques"] = ""
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn(
+            "Debe indicar la cantidad de bloques antes de solicitar "
+            "propuestas de fechas.",
+            mensajes,
+        )
+        self.assertNotIn("propuestas", respuesta.context)
+
+    def test_proponer_cantidad_bloques_no_numerica_muestra_mensaje_existente(self):
+        datos = self._datos_validos()
+        datos["cantidadBloques"] = "abc"
+
+        respuesta = self.client.post(reverse("proponer_fechas_audiencia"), datos)
+
+        self.assertEqual(respuesta.status_code, 200)
+        mensajes = [str(m) for m in respuesta.context["messages"]]
+        self.assertIn("La cantidad de bloques ingresada no es válida.", mensajes)
         self.assertNotIn("propuestas", respuesta.context)
 
 

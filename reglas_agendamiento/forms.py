@@ -64,72 +64,54 @@ from .models import ReglaAgendamiento
 class ConfiguracionAgendamientoForm(forms.ModelForm):
     """
     Formulario para editar la configuración general de
-    agendamiento (pestaña "General"): jornada de atención,
-    duración de cada bloque y horizonte de búsqueda.
+    agendamiento (pestaña "General"): por ahora, únicamente el
+    horizonte de búsqueda de fechas para la programación
+    automática de audiencias.
+
+    "horaInicioJornada", "horaTerminoJornada" y "duracionBloque"
+    siguen existiendo tal cual en el modelo ConfiguracionAgendamiento
+    y en la base de datos (no se tocó el modelo ni se generó
+    ninguna migración), pero se retiraron de este formulario a
+    propósito: hoy ningún servicio de negocio los lee (a
+    diferencia de "horizonteBusquedaDias", que sí usa
+    GeneradorPropuestaFecha en audiencias/services.py), así que
+    mostrarlos como editables sugería un efecto que en realidad
+    no tienen. Si en el futuro se implementa la generación real
+    de BloqueHorario a partir de estos tres campos, se vuelven a
+    agregar aquí.
 
     No incluye "claveUnica": es un campo técnico no editable
     (editable=False en el modelo), que ModelForm ya excluye
     automáticamente aunque se listara en Meta.fields. No hace
     falta un save() personalizado para "siempre usar la misma
     instancia": eso lo decide la vista (configuracion_general,
-    en views.py), pasando la instancia existente -o None, si
-    todavía no existe ninguna- al construir este formulario.
+    en views.py), pasando la instancia existente -o una instancia
+    nueva sin guardar, con los tres campos retirados ya
+    completados con valores de respaldo, si todavía no existe
+    ninguna fila- al construir este formulario.
     """
-
-    # Duración de cada bloque horario, en minutos. Declarado
-    # explícitamente (en vez de dejar que ModelForm genere el
-    # IntegerField por defecto para este campo del modelo) para
-    # que sea un Select con únicamente las opciones 15/30/45/60,
-    # y para que esa restricción se valide de verdad en el
-    # servidor: TypedChoiceField rechaza cualquier valor que no
-    # esté en "choices" con un error de validación ("Escoja una
-    # opción válida..."), no es solo una pista visual del
-    # navegador. Mismo patrón ya usado en
-    # audiencias/forms.py:AudienciaForm.cantidadBloques.
-    # coerce=int asegura que cleaned_data["duracionBloque"] siga
-    # siendo un int, igual que antes, para que el resto del
-    # sistema (y el propio modelo, un PositiveIntegerField) lo
-    # reciba sin ningún cambio; no fue necesario modificar el
-    # modelo ni ninguna migración.
-    duracionBloque = forms.TypedChoiceField(
-        choices=[
-            (15, "15 minutos"),
-            (30, "30 minutos"),
-            (45, "45 minutos"),
-            (60, "60 minutos"),
-        ],
-        coerce=int,
-        label="Duración del bloque (minutos)",
-    )
 
     class Meta:
         model = ConfiguracionAgendamiento
 
-        # Los cuatro campos configurables que ya existen en el
-        # modelo. No se agrega ningún campo adicional.
+        # Único campo configurable desde esta pantalla. "horaInicioJornada",
+        # "horaTerminoJornada" y "duracionBloque" siguen siendo campos
+        # reales del modelo (ver docstring de la clase), simplemente ya
+        # no se editan desde este formulario.
         fields = [
-            "horaInicioJornada",
-            "horaTerminoJornada",
-            "duracionBloque",
             "horizonteBusquedaDias",
         ]
-
-        # Selectores de hora nativos del navegador, mismo
-        # criterio que BloqueHorarioForm.
-        widgets = {
-            "horaInicioJornada": forms.TimeInput(attrs={"type": "time"}),
-            "horaTerminoJornada": forms.TimeInput(attrs={"type": "time"}),
-        }
 
     def __init__(self, *args, **kwargs):
         """
         Agrega la clase Bootstrap correspondiente a cada campo
-        (form-control / form-select) según el tipo de widget -
-        "duracionBloque" es un Select (TypedChoiceField declarado
-        arriba), el resto son inputs de hora/número-. Exclusivamente
-        presentación: no cambia validación ni comportamiento.
-        setdefault no pisa "type": "time" ya declarado en
-        Meta.widgets.
+        (form-control / form-select) según el tipo de widget.
+        Exclusivamente presentación: no cambia validación ni
+        comportamiento. Con un único campo (horizonteBusquedaDias,
+        un input numérico), siempre cae en la rama "form-control",
+        pero se mantiene el mismo bucle genérico que ya usa el
+        resto de los formularios del proyecto, por si el formulario
+        vuelve a crecer más adelante.
         """
 
         super().__init__(*args, **kwargs)

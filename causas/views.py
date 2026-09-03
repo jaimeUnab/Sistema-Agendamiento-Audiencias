@@ -27,6 +27,10 @@ from django.views.decorators.http import require_POST
 
 from usuarios.decorators import solo_administrador
 
+# Modelo de competencias del sistema: se usa para el selector del
+# filtro "Competencia" del listado de causas (ver lista_causas).
+from competencias.models import Competencia
+
 from .forms import ImportarCausasForm
 from .models import Causa
 from .services import ServicioImportacionCausas
@@ -45,11 +49,70 @@ def lista_causas(request):
     existiera. Es una vista de solo lectura: no crea, edita ni
     elimina ninguna Causa (no hay CRUD completo de causas en
     este alcance, solo importación + consulta).
+
+    Admite dos filtros opcionales, combinables entre sí, recibidos
+    por GET (mismo criterio que agenda_diaria/agenda_semanal en
+    audiencias/views.py: una consulta de solo lectura no modifica
+    nada, así que sus filtros viajan como parámetros de consulta,
+    no como POST):
+
+    - "rit": coincidencia parcial (rit__icontains), sin distinguir
+      mayúsculas/minúsculas. Por ejemplo, "C-1" encuentra "C-1",
+      "C-10", "C-100".
+    - "competencia": el id de una Competencia. Se ofrecen TODAS
+      las competencias en el selector (activas e inactivas) -mismo
+      criterio que ya usa ReglaAgendamientoForm para su propio
+      selector de competencia-, porque este filtro busca sobre
+      causas ya existentes, que pueden pertenecer a una competencia
+      desactivada después de haberse creado.
+
+    Si "competencia" llega vacío (opción "Todas") no se agrega
+    ningún filtro de competencia. Si llega con un valor que no
+    corresponde a ninguna Competencia existente, se informa como
+    error (mismo criterio que "La sala seleccionada no es válida."
+    en agenda_diaria) y tampoco se agrega el filtro -en vez de
+    dejar que Django intente convertir un id inválido a entero y
+    falle con un ValueError, mismo problema ya detectado en
+    ver_disponibilidad_audiencia-.
+
+    Sin filtros (ambos parámetros ausentes o vacíos), el
+    comportamiento es idéntico al de antes: se muestran todas las
+    causas.
     """
 
-    causas = Causa.objects.select_related("competencia").all()
+    rit_buscado = request.GET.get("rit", "").strip()
+    competencia_id = request.GET.get("competencia", "")
 
-    return render(request, "causas/lista.html", {"causas": causas})
+    competencia_seleccionada = None
+    if competencia_id:
+        competencia_seleccionada = Competencia.objects.filter(
+            pk=competencia_id
+        ).first()
+        if competencia_seleccionada is None:
+            messages.error(request, "La competencia seleccionada no es válida.")
+
+    filtro_causas = {}
+    if rit_buscado:
+        filtro_causas["rit__icontains"] = rit_buscado
+    if competencia_seleccionada:
+        filtro_causas["competencia"] = competencia_seleccionada
+
+    causas = Causa.objects.select_related("competencia").filter(**filtro_causas)
+
+    context = {
+        "causas": causas,
+        "rit_buscado": rit_buscado,
+        # Todas las competencias (activas e inactivas), para poblar
+        # el selector del filtro -ver docstring de esta vista-.
+        "competencias": Competencia.objects.all().order_by("nombre"),
+        "competencia_seleccionada": competencia_seleccionada,
+        # Distingue, en el template, "no existe ninguna causa" de
+        # "ninguna causa coincide con el filtro aplicado" -mismo
+        # criterio que "mensaje_sin_audiencias" en agenda_diaria-.
+        "hay_filtros_activos": bool(rit_buscado or competencia_seleccionada),
+    }
+
+    return render(request, "causas/lista.html", context)
 
 
 # =====================================================

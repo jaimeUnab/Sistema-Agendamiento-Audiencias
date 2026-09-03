@@ -131,6 +131,7 @@ Agenda diaria
                 <thead>
                     <tr>
                         <th>Hora</th>
+                        <th>Competencia</th>
                         <th>RIT</th>
                         <th>Carátula</th>
                         <th>Tipo de audiencia</th>
@@ -146,6 +147,10 @@ Agenda diaria
                             {{ audiencia.horaInicio|time:"H:i" }} -
                             {{ audiencia.horaTermino|time:"H:i" }}
                         </td>
+                        <!-- Competencia de la causa asociada, vía la
+                             relación ya existente Audiencia -> Causa ->
+                             Competencia (sin campo ni relación nueva). -->
+                        <td>{{ audiencia.causa.competencia.nombre }}</td>
                         <td>{{ audiencia.causa.rit }}</td>
                         <td>{{ audiencia.causa.caratulado }}</td>
                         <td>{{ audiencia.tipoAudiencia.nombre }}</td>
