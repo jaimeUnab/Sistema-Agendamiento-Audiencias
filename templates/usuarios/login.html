@@ -5,9 +5,9 @@
 
 {% block content %}
 
-<div class="container vh-100 d-flex justify-content-center align-items-center">
+<div class="container vh-100 d-flex flex-column justify-content-center align-items-center">
 
-    <div class="card shadow-lg p-5" style="width:450px; border-radius:20px;">
+    <div class="card login-card shadow-lg p-5">
 
         <!-- Logo oficial del sistema (mismo archivo que usa el sidebar en
              base_dashboard.html: static/img/icono programa.png, no se
@@ -25,15 +25,25 @@
 
         <div class="text-center mb-4">
 
-            <h2 class="fw-bold text-primary">
-                Sistema de Agendamiento
-            </h2>
+            <!-- Título único en dos líneas (ver .login-title en
+                 static/css/style.css): antes eran dos elementos con
+                 tamaños distintos (h2 fw-bold + h4 fw-light), lo que
+                 hacía leer "de Audiencias" como un subtítulo aparte.
+                 Un solo elemento con <br> garantiza el mismo tamaño,
+                 peso y color en ambas líneas. -->
+            <h1 class="login-title text-primary">
+                Sistema de Agendamiento<br>de Audiencias
+            </h1>
 
-            <h4 class="fw-light">
-                de Audiencias
-            </h4>
+            <p class="login-version text-muted">
+                Versión 1.0.0
+            </p>
 
-            <p class="text-muted mt-3">
+            <p class="login-tagline text-muted">
+                Gestión y Control de Audiencias
+            </p>
+
+            <p class="text-muted mt-3 mb-0">
                 Inicie sesión para acceder al sistema
             </p>
 
@@ -86,6 +96,12 @@
         </form>
 
     </div>
+
+    <!-- Pie de página de esta pantalla (ver .login-footer en
+         static/css/style.css): fuera de la tarjeta, discreto. -->
+    <p class="login-footer text-muted text-center">
+        Sistema de Agendamiento de Audiencias · Versión 1.0.0
+    </p>
 
 </div>
 

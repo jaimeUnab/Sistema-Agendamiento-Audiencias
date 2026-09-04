@@ -420,6 +420,158 @@ a{
 
 
 /*
+    Tarjeta de la pantalla de login (templates/usuarios/login.html).
+
+    Antes el ancho/radio de esquina se fijaban con un style="" en
+    línea; se trasladan aquí -una clase exclusiva de esta pantalla,
+    no se toca ".card" global, usada por el resto del sistema-.
+    max-width:90vw evita que la tarjeta se corte en pantallas más
+    angostas que 450px (responsive).
+*/
+.login-card{
+
+    width:100%;
+
+    max-width:450px;
+
+    min-width:0;
+
+    border-radius:20px;
+
+}
+
+
+/*
+    Logo de la pantalla de login: se reduce levemente (de 160px a
+    140px) para equilibrar la composición junto con el título,
+    versión y leyenda institucional agregados debajo. Mismo logo,
+    mismo recorte circular (ver más arriba): solo cambia el tamaño
+    máximo.
+*/
+.logo-login{
+
+    max-width:140px;
+
+}
+
+
+/*
+    Título de la pantalla de login, en dos líneas ("Sistema de
+    Agendamiento" / "de Audiencias" mediante un <br>, ver
+    login.html) con el MISMO tamaño y peso en ambas -un único
+    elemento, no dos con estilos distintos-. El color reutiliza la
+    utilidad "text-primary" de Bootstrap (el azul institucional ya
+    en uso en todo el sistema, sin redefinirlo aquí).
+*/
+.login-title{
+
+    font-size:28px;
+
+    font-weight:700;
+
+    line-height:1.25;
+
+    margin:0;
+
+}
+
+
+/*
+    Versión del sistema, bajo el título: texto pequeño, más chico
+    que ".login-title", que no compite con el nombre del sistema.
+    El color gris reutiliza la utilidad "text-muted" de Bootstrap
+    (ver login.html), igual que el resto de los textos secundarios
+    de esta pantalla.
+*/
+.login-version{
+
+    font-size:13px;
+
+    margin:4px 0 0;
+
+}
+
+
+/*
+    Leyenda institucional ("Gestión y Control de Audiencias"):
+    mismo tratamiento discreto que ".login-version" (tamaño y
+    "text-muted"), con algo más de separación arriba para no
+    leerse como parte del bloque título/versión.
+*/
+.login-tagline{
+
+    font-size:13px;
+
+    margin:10px 0 0;
+
+    letter-spacing:.3px;
+
+}
+
+
+/*
+    Campos del formulario de login: mismo ".form-control" de
+    Bootstrap que el resto del sistema, con borde, alto y estado
+    focus reforzados -el selector queda acotado a ".login-card",
+    así que no cambia ningún otro formulario del sistema-.
+*/
+.login-card .form-control{
+
+    border:1px solid #d7dde5;
+
+    border-radius:10px;
+
+    padding:10px 14px;
+
+}
+
+.login-card .form-control:focus{
+
+    border-color:#0d6efd;
+
+    box-shadow:0 0 0 .2rem rgba(13,110,253,.15);
+
+}
+
+
+/*
+    Botón "Iniciar sesión": mismo azul institucional
+    (.btn-primary de Bootstrap, sin redefinir el color) y la misma
+    animación de ".btn" global (translateY al hover, ver arriba en
+    este archivo); solo se refuerzan bordes/tamaño y se agrega una
+    sombra suave al hover, acotado a ".login-card" para no afectar
+    los demás botones del sistema.
+*/
+.login-card .btn-primary{
+
+    border-radius:12px;
+
+    padding:12px 20px;
+
+}
+
+.login-card .btn-primary:hover{
+
+    box-shadow:0 8px 18px rgba(13,110,253,.35);
+
+}
+
+
+/*
+    Pie de página de la pantalla de login, fuera de la tarjeta:
+    igual de discreto que ".login-version"/".login-tagline"
+    (mismo criterio, un punto más chico).
+*/
+.login-footer{
+
+    font-size:12px;
+
+    margin-top:24px;
+
+}
+
+
+/*
     Nombre del sistema.
 
     Es texto puramente decorativo/identificador, no un enlace de
