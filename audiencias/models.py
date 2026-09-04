@@ -251,11 +251,25 @@ class RegistroTrazabilidad(models.Model):
     y cuáles eran los valores antes y después del cambio.
 
     Solo define la estructura de datos: el servicio que
-    efectivamente crea estos registros (ServicioTrazabilidad)
-    se implementará en una etapa posterior. Por eso mismo,
-    este modelo no impide todavía su modificación o
-    eliminación por código: esa restricción se aplicará más
-    adelante a nivel de administración/permisos, no aquí.
+    efectivamente crea estos registros es ServicioTrazabilidad
+    (audiencias/services.py), que únicamente inserta -nunca
+    modifica ni elimina- filas de este modelo.
+
+    La modificación y eliminación de estos registros ya están
+    bloqueadas, no solo a nivel de aplicación (nada en el código
+    del proyecto las hace), sino también a nivel de base de
+    datos: la migración
+    0005_bloquear_modificacion_registrotrazabilidad agrega un
+    trigger BEFORE UPDATE OR DELETE en PostgreSQL que rechaza
+    cualquier intento, incluso uno hecho por fuera del ORM (por
+    ejemplo, una consulta SQL directa). No se implementó como un
+    permiso GRANT/REVOKE porque el usuario con el que Django se
+    conecta a la base de datos es superusuario de PostgreSQL
+    (ver el comentario junto a DATABASES en config/settings.py)
+    y, por diseño de PostgreSQL, un superusuario ignora
+    cualquier REVOKE; un trigger sí lo bloquea, porque es lógica
+    procedural ligada a la tabla, no una verificación de
+    privilegios.
     """
 
     # Audiencia afectada por la operación.

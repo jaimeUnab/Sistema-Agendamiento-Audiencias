@@ -128,6 +128,18 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # BASE DE DATOS
 # =============================================================================
 
+# USER='postgres' es el superusuario de PostgreSQL: apropiado para
+# desarrollo local, pero no para un despliegue institucional. Un
+# superusuario ignora cualquier privilegio GRANT/REVOKE (por diseño
+# de PostgreSQL), así que ninguna restricción de permisos a nivel de
+# base de datos tendría efecto contra esta conexión -es, de hecho,
+# la razón por la que la protección de RegistroTrazabilidad/
+# RegistroAcceso contra UPDATE/DELETE se implementó como un trigger
+# (audiencias/migrations/0005_bloquear_modificacion_registrotrazabilidad.py,
+# usuarios/migrations/0004_bloquear_modificacion_registroacceso.py) y
+# no como un REVOKE-. El despliegue institucional debe crear y usar
+# un rol de aplicación sin SUPERUSER, con únicamente los privilegios
+# que Django necesita sobre la base "agendamiento".
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',

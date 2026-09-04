@@ -22,6 +22,8 @@ import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.db.utils import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -1867,32 +1869,44 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
         self.assertEqual(registros[0]["accionLabel"], "Creación de audiencia")
 
     def test_registros_ordenados_del_mas_antiguo_al_mas_reciente(self):
-        primero = RegistroTrazabilidad.objects.create(
-            audiencia=self.audiencia,
-            usuario=self.usuario,
-            accion=AccionTrazabilidad.CREACION,
-            valoresAnteriores=None,
-            valoresNuevos={"estado": "PROGRAMADA"},
+        """
+        fechaHora es auto_now_add (audiencias/models.py): ya no se
+        puede forzar el orden con un .update() posterior, porque
+        audiencias_registrotrazabilidad tiene un trigger BEFORE
+        UPDATE OR DELETE que lo rechaza a nivel de base de datos
+        (ver la migración de RunSQL correspondiente y
+        ProteccionBaseDatosRegistroTrazabilidadTests, más abajo en
+        este mismo archivo). En su lugar, se controla fechaHora en
+        el momento mismo de crear cada registro, mockeando
+        django.utils.timezone.now() -la función que auto_now_add
+        usa internamente al hacer INSERT-. No requiere freezegun
+        (no es una dependencia del proyecto, ver requirements.txt):
+        alcanza con unittest.mock.patch, ya usado en este archivo.
+        """
+        primeraFecha = datetime.datetime(
+            2027, 5, 20, 9, 0, tzinfo=datetime.timezone.utc
         )
-        segundo = RegistroTrazabilidad.objects.create(
-            audiencia=self.audiencia,
-            usuario=self.usuario,
-            accion=AccionTrazabilidad.MODIFICACION,
-            valoresAnteriores={"anotacion": ""},
-            valoresNuevos={"anotacion": "Texto nuevo"},
+        segundaFecha = datetime.datetime(
+            2027, 5, 20, 10, 0, tzinfo=datetime.timezone.utc
         )
 
-        # auto_now_add ya fijó fechaHora al crear cada registro;
-        # se fuerza un orden cronológico inequívoco con .update()
-        # -que no vuelve a disparar auto_now_add, a diferencia de
-        # .save()- para que la prueba no dependa de la resolución
-        # del reloj entre dos create() consecutivos.
-        RegistroTrazabilidad.objects.filter(pk=primero.pk).update(
-            fechaHora=datetime.datetime(2027, 5, 20, 9, 0, tzinfo=datetime.timezone.utc)
-        )
-        RegistroTrazabilidad.objects.filter(pk=segundo.pk).update(
-            fechaHora=datetime.datetime(2027, 5, 20, 10, 0, tzinfo=datetime.timezone.utc)
-        )
+        with patch("django.utils.timezone.now", return_value=primeraFecha):
+            RegistroTrazabilidad.objects.create(
+                audiencia=self.audiencia,
+                usuario=self.usuario,
+                accion=AccionTrazabilidad.CREACION,
+                valoresAnteriores=None,
+                valoresNuevos={"estado": "PROGRAMADA"},
+            )
+
+        with patch("django.utils.timezone.now", return_value=segundaFecha):
+            RegistroTrazabilidad.objects.create(
+                audiencia=self.audiencia,
+                usuario=self.usuario,
+                accion=AccionTrazabilidad.MODIFICACION,
+                valoresAnteriores={"anotacion": ""},
+                valoresNuevos={"anotacion": "Texto nuevo"},
+            )
 
         respuesta = self.client.get(
             reverse("ver_trazabilidad_audiencia", args=[self.audiencia.pk])
@@ -1905,10 +1919,7 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
         registros = list(respuesta.context["registros"])
         self.assertEqual(
             [r["fechaHora"] for r in registros],
-            [
-                datetime.datetime(2027, 5, 20, 9, 0, tzinfo=datetime.timezone.utc),
-                datetime.datetime(2027, 5, 20, 10, 0, tzinfo=datetime.timezone.utc),
-            ],
+            [primeraFecha, segundaFecha],
         )
 
     def _snapshot_base(self):
@@ -2063,4 +2074,96 @@ class VerTrazabilidadAudienciaIntegrationTests(TestCase):
         self.assertContains(
             respuesta,
             f"{reverse('agenda_diaria')}?fecha={self.fecha.isoformat()}",
+        )
+
+
+# =====================================================
+# PROTECCIÓN DE RegistroTrazabilidad A NIVEL DE BASE DE DATOS
+# =====================================================
+
+class ProteccionBaseDatosRegistroTrazabilidadTests(TestCase):
+    """
+    Verifica el trigger BEFORE UPDATE OR DELETE agregado en la
+    migración audiencias.0005_bloquear_modificacion_registrotrazabilidad:
+    ni un UPDATE ni un DELETE directos sobre
+    audiencias_registrotrazabilidad deben poder ejecutarse, sin
+    importar que se hagan por fuera del ORM/servicios del proyecto
+    -es justamente el escenario que un trigger de base de datos
+    cubre y que ningún control a nivel de aplicación puede evitar-.
+
+    Cada prueba envuelve la operación bloqueada en su propio
+    transaction.atomic(): PostgreSQL aborta la transacción completa
+    en cuanto el trigger lanza la excepción, así que sin un atomic()
+    propio (que crea un SAVEPOINT) el resto de la prueba -incluida
+    la limpieza automática de TestCase- fallaría con
+    TransactionManagementError.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="usuario_proteccion_trazabilidad",
+            email="proteccion_trazabilidad@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Protección Trazabilidad",
+        )
+        competencia = Competencia.objects.create(
+            nombre="Competencia Protección Trazabilidad"
+        )
+        tipo_audiencia = TipoAudiencia.objects.create(
+            nombre="Tipo Protección Trazabilidad", activo=True
+        )
+        sala = Sala.objects.create(
+            nombre="Sala Protección Trazabilidad", activa=True
+        )
+        causa = Causa.objects.create(
+            competencia=competencia,
+            rit="7005-2027",
+            ruc="2700070050-4",
+            caratulado="Causa Protección Trazabilidad",
+        )
+        bloque = BloqueHorario.objects.create(
+            orden=9733,
+            horaInicio=datetime.time(9, 0),
+            horaTermino=datetime.time(9, 30),
+        )
+        self.audiencia = Audiencia.objects.create(
+            causa=causa,
+            tipoAudiencia=tipo_audiencia,
+            sala=sala,
+            bloqueInicio=bloque,
+            cantidadBloques=1,
+            fecha=datetime.date(2027, 5, 20),
+            horaInicio=bloque.horaInicio,
+            horaTermino=bloque.horaTermino,
+            usuarioCreacion=self.usuario,
+        )
+        self.registro = RegistroTrazabilidad.objects.create(
+            audiencia=self.audiencia,
+            usuario=self.usuario,
+            accion=AccionTrazabilidad.CREACION,
+            valoresAnteriores=None,
+            valoresNuevos={"estado": "PROGRAMADA"},
+        )
+
+    def test_update_directo_lanza_excepcion_de_base_de_datos(self):
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                RegistroTrazabilidad.objects.filter(
+                    pk=self.registro.pk
+                ).update(accion=AccionTrazabilidad.BAJA)
+
+        # El registro no cambió: el trigger rechazó el UPDATE antes
+        # de que se aplicara.
+        self.registro.refresh_from_db()
+        self.assertEqual(self.registro.accion, AccionTrazabilidad.CREACION)
+
+    def test_delete_directo_lanza_excepcion_de_base_de_datos(self):
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                self.registro.delete()
+
+        # El registro sigue existiendo: el trigger rechazó el
+        # DELETE antes de que se aplicara.
+        self.assertTrue(
+            RegistroTrazabilidad.objects.filter(pk=self.registro.pk).exists()
         )

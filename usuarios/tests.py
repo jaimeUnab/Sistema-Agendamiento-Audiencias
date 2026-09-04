@@ -32,6 +32,8 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
+from django.db import transaction
+from django.db.utils import DatabaseError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -376,11 +378,19 @@ class ExpiracionSesionPorInactividadTests(TestCase):
         para el sistema, indistinguible de un usuario que nunca
         inició sesión: no debe generar ningún RegistroAcceso
         nuevo.
+
+        No se limpia RegistroAcceso.objects.all() antes de la
+        aserción (como sí hacía esta prueba antes): desde que
+        RegistroAcceso está protegido con un trigger BEFORE
+        DELETE (migración 0004_bloquear_modificacion_registroacceso),
+        ya no se puede. No hace falta: la aserción de abajo ya
+        filtra por tipoEvento=ACCESO_DENEGADO específicamente, así
+        que el LOGIN_EXITOSO que dejó self.client.login() no la
+        afecta.
         """
         self.client.login(
             username=self.usuario.email, password="ClaveSegura123"
         )
-        RegistroAcceso.objects.all().delete()
 
         sesion = Session.objects.get(
             session_key=self.client.session.session_key
@@ -395,4 +405,60 @@ class ExpiracionSesionPorInactividadTests(TestCase):
                 tipoEvento=TipoEventoAcceso.ACCESO_DENEGADO
             ).count(),
             0,
+        )
+
+
+# =====================================================
+# 5. PROTECCIÓN DE RegistroAcceso A NIVEL DE BASE DE DATOS
+# =====================================================
+
+class ProteccionBaseDatosRegistroAccesoTests(TestCase):
+    """
+    Verifica el trigger BEFORE UPDATE OR DELETE agregado en la
+    migración usuarios.0004_bloquear_modificacion_registroacceso:
+    ni un UPDATE ni un DELETE directos sobre usuarios_registroacceso
+    deben poder ejecutarse. Mismo criterio que
+    audiencias.tests.test_integration.ProteccionBaseDatosRegistroTrazabilidadTests,
+    para el otro registro de auditoría del sistema.
+
+    Complementa -no reemplaza- la protección ya existente a nivel
+    de aplicación: RegistroAccesoAdmin ya impide editar/borrar
+    desde el panel de administración (usuarios/admin.py), y esta
+    prueba confirma que, aunque esa capa se saltara por completo
+    (una consulta directa a la base de datos, por ejemplo), la
+    base de datos igual lo rechaza.
+    """
+
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            username="proteccion_registro_acceso",
+            email="proteccion_registro_acceso@tribunal.cl",
+            password="ClaveSegura123",
+            nombre="Usuario Protección RegistroAcceso",
+            rol=RolUsuario.USUARIO,
+        )
+        self.registro = RegistroAcceso.objects.create(
+            usuario=self.usuario,
+            nombreUsuarioIntentado=self.usuario.email,
+            tipoEvento=TipoEventoAcceso.LOGIN_EXITOSO,
+            exitoso=True,
+        )
+
+    def test_update_directo_lanza_excepcion_de_base_de_datos(self):
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                RegistroAcceso.objects.filter(pk=self.registro.pk).update(
+                    exitoso=False
+                )
+
+        self.registro.refresh_from_db()
+        self.assertTrue(self.registro.exitoso)
+
+    def test_delete_directo_lanza_excepcion_de_base_de_datos(self):
+        with self.assertRaises(DatabaseError):
+            with transaction.atomic():
+                self.registro.delete()
+
+        self.assertTrue(
+            RegistroAcceso.objects.filter(pk=self.registro.pk).exists()
         )
